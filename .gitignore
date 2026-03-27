@@ -35,3 +35,7 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 
 # Claude Code local settings
 .claude/CLAUDE.local.md
+
+# Wrangler
+.wrangler
+.dev.vars
