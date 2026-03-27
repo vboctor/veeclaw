@@ -2,5 +2,8 @@
   "name": "scaf-llm-gateway",
   "main": "src/index.ts",
   "compatibility_date": "2025-03-27",
-  "compatibility_flags": ["nodejs_compat"]
+  "compatibility_flags": ["nodejs_compat"],
+  "kv_namespaces": [
+    { "binding": "MEMORY_KV", "id": "PLACEHOLDER" }
+  ]
 }
