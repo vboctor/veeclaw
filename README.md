@@ -8,15 +8,20 @@ A modular, provider-agnostic LLM framework with a terminal chat interface, a Clo
 Telegram Bot ───┐           │
                 ▼           ▼
           Telegram Gateway → Agent → LLM Gateway → OpenRouter
+                              ↕
+                        Google Connector → Gmail, Calendar, Drive
                              (3-tier memory via KV)
                              (scheduling via KV + cron)
+                             (tool calling with execution loop)
                              (dispatch: Telegram, HTTP)
 ```
 
 ## Features
 
 - **CLI TUI** — Interactive terminal chat with real-time streaming, markdown rendering, and model switching
-- **Agent Worker** — Cloudflare Worker that owns memory, system prompt, scheduling, and dispatch
+- **Agent Worker** — Cloudflare Worker that owns memory, system prompt, scheduling, tool calling, and dispatch
+- **Google Connector** — Cloudflare Worker providing Gmail, Google Calendar, and Google Drive access via direct REST APIs
+- **Tool calling** — LLM can invoke Google tools autonomously with a multi-round execution loop
 - **LLM Gateway Worker** — Cloudflare Worker passthrough to OpenRouter (internal only, no public access)
 - **Telegram Gateway Worker** — Telegram bot that relays messages through the Agent
 - **Natural-language scheduling** — Create, list, update, and delete schedules through conversation
@@ -38,9 +43,11 @@ workers/
   agent/                      Cloudflare Worker — Agent (memory, prompts, scheduling, dispatch)
     src/memory/               3-tier memory system (KV-backed)
     src/schedule/             Schedule store, heartbeat, dispatch, extraction, context injection
+    src/tools/                Tool definitions and execution (Google tools)
     src/prompts/              System prompt
   llm-gateway/                Cloudflare Worker — LLM passthrough to OpenRouter (internal only)
   telegram-gateway/           Cloudflare Worker — Telegram bot
+  connectors/google/          Cloudflare Worker — Google Connector (Gmail, Calendar, Drive)
 ```
 
 ## Prerequisites
@@ -49,6 +56,7 @@ workers/
 - [Wrangler](https://developers.cloudflare.com/workers/wrangler/) (for deploying Workers)
 - An [OpenRouter](https://openrouter.ai) API key
 - A Telegram bot token from [@BotFather](https://t.me/BotFather) (for the Telegram gateway)
+- A Google Cloud project with Gmail, Calendar, and Drive APIs enabled (for the Google Connector)
 
 ## Quick Start
 
@@ -79,12 +87,17 @@ bun test                   # Run tests
 bun run dev:agent          # Run Agent worker locally (wrangler dev)
 bun run dev:gateway        # Run LLM gateway locally (wrangler dev)
 bun run dev:telegram       # Run Telegram gateway locally (wrangler dev)
+bun run dev:google         # Run Google Connector locally (wrangler dev)
 
 # Workers — deploy to Cloudflare
 bun run deploy             # Deploy all workers
 bun run deploy:agent       # Deploy Agent worker only
 bun run deploy:gateway     # Deploy LLM gateway only
 bun run deploy:telegram    # Deploy Telegram gateway only
+bun run deploy:google      # Deploy Google Connector only
+
+# Google OAuth
+bun run google-auth        # Run OAuth2 browser flow to authorize Google access
 ```
 
 ## CLI Commands
@@ -111,12 +124,30 @@ bun run setup
 The setup wizard detects existing state and only performs what's missing:
 
 - Prompts for any secrets not yet in `.env`
-- Creates the KV namespace (or reuses existing)
-- Deploys all three workers
+- Creates KV namespaces (AGENT_KV and TOOL_CACHE, or reuses existing)
+- Deploys all four workers
 - Pushes secrets to Cloudflare (only missing ones)
 - Registers the Telegram webhook
 
 Re-run `bun run setup` at any time — it's incremental and safe to repeat. Use `bun run setup --force` to redo everything.
+
+### Teardown
+
+### Google Connector setup
+
+The Google Connector requires a one-time OAuth2 authorization:
+
+1. Create a Google Cloud project and enable **Gmail API**, **Google Calendar API**, and **Google Drive API**
+2. Create an OAuth 2.0 Client ID (Desktop app type) and set `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` in `.env`
+3. Run the OAuth flow:
+
+```bash
+bun run google-auth
+```
+
+This opens a browser for Google consent, exchanges the authorization code for a refresh token, and saves `GOOGLE_REFRESH_TOKEN` to `.env`. Works for both consumer (gmail.com) and Google Workspace accounts.
+
+4. Run `bun run setup` to push the secrets to Cloudflare
 
 ### Teardown
 
@@ -157,9 +188,23 @@ The Agent automatically manages conversation memory via Cloudflare KV (`AGENT_KV
 
 Memory is injected into the system prompt and updated in the background after each response.
 
+### Google Connector
+
+The Google Connector (`workers/connectors/google/`) is a dedicated Cloudflare Worker that owns OAuth2 tokens and all Google API interactions. The Agent calls it via service binding — no public HTTP access.
+
+**Gmail tools:** `gmail_search`, `gmail_read`, `gmail_send`, `gmail_draft`, `gmail_unread`
+**Calendar tools:** `calendar_list`, `calendar_get`, `calendar_create`, `calendar_update`
+**Drive tools:** `drive_list`, `drive_search`, `drive_get`, `drive_download`
+
+OAuth2 access tokens are cached in the `TOOL_CACHE` KV namespace with a 55-minute TTL and automatically refreshed using the stored refresh token.
+
+### Tool Calling
+
+The Agent injects Google tool definitions into LLM requests using the OpenAI function-calling format. When the LLM responds with `tool_calls`, the Agent executes them against the Google Connector, feeds results back, and loops until the LLM produces a final text response (up to 5 rounds). Tool calling works in both interactive conversations and scheduled task dispatch.
+
 ### LLM Gateway
 
-The LLM Gateway is a passthrough to OpenRouter. It holds the API key and is only accessible via service binding from the Agent — no public HTTP access.
+The LLM Gateway is a passthrough to OpenRouter. It holds the API key, passes through tool definitions and tool call results, and is only accessible via service binding from the Agent — no public HTTP access.
 
 ### Telegram Gateway
 
@@ -180,9 +225,9 @@ The Agent enables time-based task execution through natural language. Users crea
 2. **Agent** injects the current datetime and user timezone into the system prompt
 3. **LLM** responds with a confirmation and embeds a `<schedule_command>` block
 4. **Agent** strips the command block from the response, parses it, and stores the entry in `AGENT_KV`
-5. **Agent cron** (every minute) reads all entries from KV, finds those due within a ±30 second window, and dispatches them
-6. For **prompt** mode entries: runs the prompt through the full Agent pipeline (memory + LLM), then sends the response to Telegram
-7. For **action** mode entries: executes inline (send a fixed Telegram message or make an HTTP request)
+5. **Agent cron** (every minute) reads all entries from KV, finds those where `nextRun <= now`, and dispatches them
+6. For **prompt** mode entries: runs the prompt through the full Agent pipeline (memory + LLM + tool calling), then sends the response to Telegram with a confirmation of any actions taken
+7. For **action** mode entries: executes inline (send a fixed Telegram message or make an HTTP request) and confirms completion via Telegram
 8. **Recurring** entries get their `nextRun` recomputed from the cron expression; **one-shot** entries are deleted after firing
 
 ### Schedule Types
@@ -190,7 +235,7 @@ The Agent enables time-based task execution through natural language. Users crea
 | Type | Description |
 |---|---|
 | **Recurring** | Fires on a cron pattern. `nextRun` is recomputed after each firing. |
-| **One-shot** | Fires once at a specific time, then self-deletes. KV TTL auto-cleans orphans. |
+| **One-shot** | Fires once at a specific time, then self-deletes. Past-due one-shots are retried on the next heartbeat tick. |
 
 ### Execution Modes
 
@@ -241,7 +286,7 @@ When a recurring entry reaches its `maxRuns` limit, it is automatically deleted.
 
 ### Timing Accuracy
 
-The Agent heartbeat runs every minute with a ±30 second matching window. Scheduled events may fire up to 30 seconds early or late.
+The Agent heartbeat runs every minute. Scheduled events fire on the first heartbeat tick after their `nextRun` time, so they may be up to ~60 seconds late but are never missed.
 
 ## Tech Stack
 
@@ -253,16 +298,20 @@ The Agent heartbeat runs every minute with a ±30 second matching window. Schedu
 | Telegram bot | grammY |
 | Serverless | Cloudflare Workers + KV |
 | LLM API | OpenRouter (OpenAI-compatible) |
+| Google APIs | Direct REST (Gmail, Calendar, Drive) — no SDK |
 
 ## Architecture Decisions
 
 - **No SDK** — raw `fetch()` to OpenRouter; no OpenAI SDK dependency
 - **Bun-first** — uses Bun for runtime, testing, and package management
-- **Agent as central hub** — the Agent owns memory, prompts, scheduling, and dispatch; the LLM Gateway is a dumb passthrough
+- **Agent as central hub** — the Agent owns memory, prompts, scheduling, tool calling, and dispatch; the LLM Gateway is a dumb passthrough
+- **Connector pattern** — external service integrations are isolated in dedicated Workers (e.g. Google Connector), connected via service bindings
 - **LLM Gateway isolation** — the OpenRouter API key is isolated to the LLM Gateway, accessible only via service binding
-- **Single KV namespace** — memory (`memory:*`) and schedules (`schedule:*`) share one KV namespace with prefix separation
+- **Google Connector isolation** — OAuth2 tokens and Google API calls are isolated to the Google Connector Worker with its own KV (TOOL_CACHE)
+- **Two KV namespaces** — AGENT_KV for memory (`memory:*`) and schedules (`schedule:*`); TOOL_CACHE for OAuth2 token caching
 - **Memory as system prompt** — memory tiers are injected into the system prompt, not duplicated as messages
 - **Background processing** — memory extraction and summarization run via `waitUntil()` and never block responses
 - **Thin relay pattern** — the Telegram gateway contains no LLM logic; it delegates everything to the Agent
 - **Scheduling via conversation** — the LLM emits structured `<schedule_command>` blocks; the Agent extracts and processes them transparently
-- **Heartbeat dispatcher** — pure KV read + dispatch; LLM reasoning only happens at dispatch time for prompt-mode entries
+- **Tool execution loop** — LLM can invoke tools autonomously across multiple rounds; tool calls are routed to connectors via service bindings
+- **Heartbeat dispatcher** — pure KV read + dispatch; LLM reasoning and tool calling only happen at dispatch time for prompt-mode entries; past-due entries are never missed
