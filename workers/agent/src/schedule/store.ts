@@ -1,45 +1,51 @@
 import type { ScheduleEntry, PromptScheduleEntry } from "@scaf/shared";
-import { SCHEDULE_PREFIX } from "@scaf/shared";
 import { CronExpressionParser } from "cron-parser";
+
+const SCHEDULES_KEY = "schedules";
+
+async function loadAll(kv: KVNamespace): Promise<Record<string, ScheduleEntry>> {
+  const raw = await kv.get(SCHEDULES_KEY);
+  return raw ? (JSON.parse(raw) as Record<string, ScheduleEntry>) : {};
+}
+
+async function saveAll(kv: KVNamespace, entries: Record<string, ScheduleEntry>): Promise<void> {
+  await kv.put(SCHEDULES_KEY, JSON.stringify(entries));
+}
+
+export { loadAll, saveAll, SCHEDULES_KEY };
 
 export async function listSchedules(
   kv: KVNamespace
 ): Promise<ScheduleEntry[]> {
-  const list = await kv.list({ prefix: SCHEDULE_PREFIX });
-  const entries = await Promise.all(
-    list.keys.map(async (k) => {
-      const raw = await kv.get(k.name);
-      return raw ? (JSON.parse(raw) as ScheduleEntry) : null;
-    })
-  );
-  return entries.filter((e): e is ScheduleEntry => e !== null);
+  const entries = await loadAll(kv);
+  return Object.values(entries);
 }
 
 export async function getSchedule(
   kv: KVNamespace,
   id: string
 ): Promise<ScheduleEntry | null> {
-  const raw = await kv.get(`${SCHEDULE_PREFIX}${id}`);
-  return raw ? (JSON.parse(raw) as ScheduleEntry) : null;
+  const entries = await loadAll(kv);
+  return entries[id] ?? null;
 }
 
 export async function addSchedule(
   kv: KVNamespace,
   entry: ScheduleEntry
 ): Promise<void> {
-  await kv.put(
-    `${SCHEDULE_PREFIX}${entry.id}`,
-    JSON.stringify(entry),
-  );
+  const entries = await loadAll(kv);
+  entries[entry.id] = entry;
+  await saveAll(kv, entries);
 }
 
 export async function deleteSchedule(
   kv: KVNamespace,
   id: string
 ): Promise<boolean> {
-  const existing = await getSchedule(kv, id);
-  if (!existing) return false;
-  await kv.delete(`${SCHEDULE_PREFIX}${id}`);
+  const entries = await loadAll(kv);
+  if (!entries[id]) return false;
+  delete entries[id];
+  await saveAll(kv, entries);
   return true;
 }
 
@@ -54,7 +60,8 @@ export async function updateSchedule(
     activeHours?: ScheduleEntry["activeHours"];
   }
 ): Promise<ScheduleEntry | null> {
-  const existing = await getSchedule(kv, id);
+  const entries = await loadAll(kv);
+  const existing = entries[id];
   if (!existing) return null;
 
   const updated = { ...existing };
@@ -75,7 +82,8 @@ export async function updateSchedule(
     (updated as PromptScheduleEntry).event.content = updates.content;
   }
 
-  await kv.put(`${SCHEDULE_PREFIX}${id}`, JSON.stringify(updated));
+  entries[id] = updated;
+  await saveAll(kv, entries);
   return updated;
 }
 

@@ -1,78 +1,73 @@
 import type { ScheduleEntry } from "@scaf/shared";
-import { SCHEDULE_PREFIX } from "@scaf/shared";
 import { CronExpressionParser } from "cron-parser";
 import type { Env } from "../index.ts";
 import { dispatchScheduleEntry } from "./dispatch.ts";
+import { loadAll, saveAll } from "./store.ts";
 
 export async function runHeartbeat(env: Env): Promise<void> {
   const now = Date.now();
 
-  const list = await env.AGENT_KV.list({ prefix: SCHEDULE_PREFIX });
-  if (list.keys.length === 0) return;
+  // Single KV read for all schedules
+  const entries = await loadAll(env.AGENT_KV);
+  const ids = Object.keys(entries);
+  if (ids.length === 0) return;
 
-  const entries = await Promise.all(
-    list.keys.map(async (k) => {
-      const raw = await env.AGENT_KV.get(k.name);
-      return raw ? (JSON.parse(raw) as ScheduleEntry) : null;
-    })
-  );
-
-  // Fire any entry whose nextRun is at or before now (catches missed one-shots too)
-  const due = entries.filter(
-    (e): e is ScheduleEntry =>
-      e !== null &&
-      e.nextRun <= now &&
-      isWithinActiveHours(e, now) &&
-      !hasReachedMaxRuns(e)
-  );
+  // Find due entries
+  const due = ids
+    .map((id) => entries[id])
+    .filter(
+      (e) =>
+        e.nextRun <= now &&
+        isWithinActiveHours(e, now) &&
+        !hasReachedMaxRuns(e)
+    );
 
   if (due.length === 0) return;
 
   console.log(`[agent:heartbeat] ${due.length} entries due, dispatching...`);
-  await Promise.all(due.map((entry) => dispatch(entry, now, env)));
-}
 
-async function dispatch(
-  entry: ScheduleEntry,
-  now: number,
-  env: Env
-): Promise<void> {
-  const result = await dispatchScheduleEntry(entry, env);
-  const success = result.ok;
+  // Dispatch all due entries
+  const results = await Promise.all(
+    due.map(async (entry) => ({
+      entry,
+      ok: (await dispatchScheduleEntry(entry, env)).ok,
+    }))
+  );
 
-  const newRunCount = entry.runCount + 1;
-  const newSuccessCount = (entry.successCount ?? 0) + (success ? 1 : 0);
-  const newFailureCount = (entry.failureCount ?? 0) + (success ? 0 : 1);
+  // Update entries in-place, then do a single KV write
+  let changed = false;
+  for (const { entry, ok } of results) {
+    const newRunCount = entry.runCount + 1;
 
-  // One-shot entries are always deleted after firing
-  if (entry.type === "one-shot") {
-    await env.AGENT_KV.delete(`${SCHEDULE_PREFIX}${entry.id}`);
-    return;
+    if (entry.type === "one-shot") {
+      delete entries[entry.id];
+      changed = true;
+      continue;
+    }
+
+    if (entry.maxRuns !== undefined && newRunCount >= entry.maxRuns) {
+      console.log(`[agent:heartbeat] ${entry.id} reached maxRuns (${entry.maxRuns}), removing`);
+      delete entries[entry.id];
+      changed = true;
+      continue;
+    }
+
+    if (entry.cron) {
+      entries[entry.id] = {
+        ...entry,
+        nextRun: computeNextRun(entry.cron, now),
+        lastRun: now,
+        lastRunStatus: ok ? "success" : "failure",
+        runCount: newRunCount,
+        successCount: (entry.successCount ?? 0) + (ok ? 1 : 0),
+        failureCount: (entry.failureCount ?? 0) + (ok ? 0 : 1),
+      };
+      changed = true;
+    }
   }
 
-  // Recurring: check if maxRuns reached after this run
-  if (entry.maxRuns !== undefined && newRunCount >= entry.maxRuns) {
-    console.log(`[agent:heartbeat] ${entry.id} reached maxRuns (${entry.maxRuns}), removing`);
-    await env.AGENT_KV.delete(`${SCHEDULE_PREFIX}${entry.id}`);
-    return;
-  }
-
-  // Recurring: compute next run and persist updated counters
-  if (entry.cron) {
-    const nextRun = computeNextRun(entry.cron, now);
-    const updated: ScheduleEntry = {
-      ...entry,
-      nextRun,
-      lastRun: now,
-      lastRunStatus: success ? "success" : "failure",
-      runCount: newRunCount,
-      successCount: newSuccessCount,
-      failureCount: newFailureCount,
-    };
-    await env.AGENT_KV.put(
-      `${SCHEDULE_PREFIX}${entry.id}`,
-      JSON.stringify(updated)
-    );
+  if (changed) {
+    await saveAll(env.AGENT_KV, entries);
   }
 }
 

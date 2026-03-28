@@ -1,5 +1,7 @@
 # SCAF Development Guide
 
+Only commit, push, or deploy when explicitly asked by the user.
+
 Use Bun instead of Node.js, npm, pnpm, or vite.
 
 - Use `bun <file>` instead of `node <file>` or `ts-node <file>`
