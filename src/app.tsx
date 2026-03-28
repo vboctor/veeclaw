@@ -35,7 +35,7 @@ function displayModel(model: string): string {
 export function App() {
   const { exit } = useApp();
   const [isSetup, setIsSetup] = useState(
-    !hasSecret("gateway_url") && !hasSecret("openrouter_api_key")
+    !hasSecret("agent_url") && !hasSecret("openrouter_api_key")
   );
   const [messages, setMessages] = useState<Message[]>([]);
   const [streamingContent, setStreamingContent] = useState<string | null>(null);

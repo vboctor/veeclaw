@@ -5,25 +5,25 @@ import type {
   CompletionResponse,
 } from "./types.ts";
 
-function getGatewayUrl(): string {
-  const url = getSecret("gateway_url");
+function getAgentUrl(): string {
+  const url = getSecret("agent_url");
   if (!url) {
     throw new Error(
-      "Gateway URL not configured. Run scaf to set it up."
+      "Agent URL not configured. Run scaf to set it up."
     );
   }
   return url.replace(/\/$/, "");
 }
 
-function getGatewayToken(): string | undefined {
-  return getSecret("gateway_token");
+function getAgentToken(): string | undefined {
+  return getSecret("agent_token");
 }
 
 function buildHeaders(): Record<string, string> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
-  const token = getGatewayToken();
+  const token = getAgentToken();
   if (token) {
     headers["Authorization"] = `Bearer ${token}`;
   }
@@ -33,7 +33,7 @@ function buildHeaders(): Record<string, string> {
 export function createWorkerGateway(): LLMGateway {
   return {
     async complete(req: CompletionRequest): Promise<CompletionResponse> {
-      const url = getGatewayUrl();
+      const url = getAgentUrl();
 
       const response = await fetch(`${url}/v1/complete`, {
         method: "POST",
@@ -43,14 +43,14 @@ export function createWorkerGateway(): LLMGateway {
 
       if (!response.ok) {
         const text = await response.text();
-        throw new Error(`Gateway error (${response.status}): ${text}`);
+        throw new Error(`Agent error (${response.status}): ${text}`);
       }
 
       return (await response.json()) as CompletionResponse;
     },
 
     async *stream(req: CompletionRequest): AsyncIterable<string> {
-      const url = getGatewayUrl();
+      const url = getAgentUrl();
 
       const response = await fetch(`${url}/v1/stream`, {
         method: "POST",
@@ -60,7 +60,7 @@ export function createWorkerGateway(): LLMGateway {
 
       if (!response.ok) {
         const text = await response.text();
-        throw new Error(`Gateway error (${response.status}): ${text}`);
+        throw new Error(`Agent error (${response.status}): ${text}`);
       }
 
       const reader = response.body?.getReader();

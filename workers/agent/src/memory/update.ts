@@ -5,7 +5,7 @@ import { maybeSummarize } from "./summarize.ts";
 
 export async function appendToWorkingMemory(
   kv: KVNamespace,
-  apiKey: string,
+  llmGateway: Fetcher,
   userMessage: string,
   assistantResponse: string
 ): Promise<void> {
@@ -20,6 +20,6 @@ export async function appendToWorkingMemory(
 
   const pairs = Math.floor(existing.length / 2);
   if (pairs >= DEFAULT_MEMORY_CONFIG.workingWindow) {
-    await maybeSummarize(kv, apiKey, existing);
+    await maybeSummarize(kv, llmGateway, existing);
   }
 }

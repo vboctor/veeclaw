@@ -7,15 +7,14 @@
   // Set via `wrangler secret put`:
   //   TELEGRAM_BOT_TOKEN
   //   TELEGRAM_WEBHOOK_SECRET
-  //   LLM_GATEWAY_TOKEN (optional)
+  //   AGENT_TOKEN (optional)
 
   "vars": {
-    "LLM_GATEWAY_URL": "https://scaf-llm-gateway.vboctor.workers.dev",
     "ALLOWED_CHAT_IDS": ""
   },
 
-  // Service binding for Worker-to-Worker calls (avoids 1042 errors)
+  // Service binding to Agent worker
   "services": [
-    { "binding": "LLM_GATEWAY", "service": "scaf-llm-gateway" }
+    { "binding": "AGENT", "service": "scaf-agent" }
   ]
 }

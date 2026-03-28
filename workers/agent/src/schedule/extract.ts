@@ -1,5 +1,10 @@
 import type { ScheduleCommand } from "@scaf/shared";
-import type { SchedulerClient } from "./scheduler-client.ts";
+import {
+  addSchedule,
+  updateSchedule,
+  deleteSchedule,
+  buildScheduleEntry,
+} from "./store.ts";
 
 const COMMAND_REGEX =
   /<schedule_command>([\s\S]*?)<\/schedule_command>/g;
@@ -31,11 +36,11 @@ export function extractScheduleCommands(content: string): ExtractionResult {
 }
 
 /**
- * Process extracted schedule commands via the scheduler service binding.
+ * Process extracted schedule commands directly against KV.
  * Returns a summary of what was done for logging.
  */
 export async function processScheduleCommands(
-  scheduler: SchedulerClient,
+  kv: KVNamespace,
   commands: ScheduleCommand[]
 ): Promise<string[]> {
   const results: string[] = [];
@@ -45,17 +50,18 @@ export async function processScheduleCommands(
       switch (cmd.action) {
         case "add": {
           if (!cmd.entry) break;
-          const entry = await scheduler.add(
+          const entry = buildScheduleEntry(
             cmd.entry as unknown as Record<string, unknown>,
             cmd.nextRunIso
           );
+          await addSchedule(kv, entry);
           results.push(`Added schedule: ${entry.label} (${entry.id})`);
           break;
         }
 
         case "update": {
           if (!cmd.id || !cmd.updates) break;
-          const updated = await scheduler.update(cmd.id, cmd.updates);
+          const updated = await updateSchedule(kv, cmd.id, cmd.updates);
           if (updated) {
             results.push(`Updated schedule: ${updated.label} (${cmd.id})`);
           } else {
@@ -66,7 +72,7 @@ export async function processScheduleCommands(
 
         case "delete": {
           if (!cmd.id) break;
-          const deleted = await scheduler.delete(cmd.id);
+          const deleted = await deleteSchedule(kv, cmd.id);
           results.push(
             deleted
               ? `Deleted schedule: ${cmd.id}`

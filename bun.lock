@@ -25,22 +25,23 @@
       "name": "@scaf/shared",
       "version": "0.1.0",
     },
-    "workers/llm-gateway": {
-      "name": "@scaf/llm-gateway",
+    "workers/agent": {
+      "name": "@scaf/agent",
       "version": "0.1.0",
       "dependencies": {
         "@scaf/shared": "workspace:*",
+        "cron-parser": "^5.0.6",
       },
       "devDependencies": {
         "@cloudflare/workers-types": "^4.20250312.0",
         "wrangler": "^4",
       },
     },
-    "workers/scheduler": {
-      "name": "scaf-scheduler",
+    "workers/llm-gateway": {
+      "name": "@scaf/llm-gateway",
+      "version": "0.1.0",
       "dependencies": {
         "@scaf/shared": "workspace:*",
-        "cron-parser": "^5.0.6",
       },
       "devDependencies": {
         "@cloudflare/workers-types": "^4.20250312.0",
@@ -201,6 +202,8 @@
 
     "@poppinss/exception": ["@poppinss/exception@1.2.3", "", {}, "sha512-dCED+QRChTVatE9ibtoaxc+WkdzOSjYTKi/+uacHWIsfodVfpsueo3+DKpgU5Px8qXjgmXkSvhXvSCz3fnP9lw=="],
 
+    "@scaf/agent": ["@scaf/agent@workspace:workers/agent"],
+
     "@scaf/llm-gateway": ["@scaf/llm-gateway@workspace:workers/llm-gateway"],
 
     "@scaf/shared": ["@scaf/shared@workspace:packages/shared"],
@@ -352,8 +355,6 @@
     "require-directory": ["require-directory@2.1.1", "", {}, "sha512-fGxEI7+wsG9xrvdjsrlmL22OMTTiHRwAMroiEeMgq8gzoLC/PQr7RsRDSTLUg/bZAZtF+TVIkHc6/4RIKrui+Q=="],
 
     "restore-cursor": ["restore-cursor@4.0.0", "", { "dependencies": { "onetime": "^5.1.0", "signal-exit": "^3.0.2" } }, "sha512-I9fPXU9geO9bHOt9pHHOhOkYerIMsmVaWB0rA2AI9ERh/+x/i7MV5HKBNrg+ljO5eoPVgCcnFuRjJ9uH6I/3eg=="],
-
-    "scaf-scheduler": ["scaf-scheduler@workspace:workers/scheduler"],
 
     "scheduler": ["scheduler@0.27.0", "", {}, "sha512-eNv+WrVbKu1f3vbYJT/xtiF5syA5HPIMtf9IgY/nKg0sWqzAUEvqY/xm7OcZc/qafLx/iO9FgOmeSAp4v5ti/Q=="],
 

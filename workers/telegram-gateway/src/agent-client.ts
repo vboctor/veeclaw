@@ -4,14 +4,13 @@ import type {
   Message,
 } from "@scaf/shared";
 
-export interface GatewayEnv {
-  LLM_GATEWAY: Fetcher;
-  LLM_GATEWAY_URL: string;
-  LLM_GATEWAY_TOKEN?: string;
+export interface AgentEnv {
+  AGENT: Fetcher;
+  AGENT_TOKEN?: string;
 }
 
 export async function complete(
-  env: GatewayEnv,
+  env: AgentEnv,
   messages: Message[],
   model?: string
 ): Promise<string> {
@@ -21,13 +20,11 @@ export async function complete(
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
-  if (env.LLM_GATEWAY_TOKEN) {
-    headers["Authorization"] = `Bearer ${env.LLM_GATEWAY_TOKEN}`;
+  if (env.AGENT_TOKEN) {
+    headers["Authorization"] = `Bearer ${env.AGENT_TOKEN}`;
   }
 
-  // Use service binding for Worker-to-Worker calls
-  const target = env.LLM_GATEWAY;
-  const res = await target.fetch("https://internal/v1/complete", {
+  const res = await env.AGENT.fetch("https://internal/v1/complete", {
     method: "POST",
     headers,
     body: JSON.stringify(body),
@@ -35,7 +32,7 @@ export async function complete(
 
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`LLM gateway error ${res.status}: ${text}`);
+    throw new Error(`Agent error ${res.status}: ${text}`);
   }
 
   const data = (await res.json()) as CompletionResponse;

@@ -1,10 +1,10 @@
 import { Bot, type Context } from "grammy";
 import type { Message } from "@scaf/shared";
-import { complete, type GatewayEnv } from "./gateway-client.ts";
+import { complete, type AgentEnv } from "./agent-client.ts";
 import { getHistory, appendToHistory, clearHistory } from "./history.ts";
 import { chunkText } from "./chunks.ts";
 
-export interface BotEnv extends GatewayEnv {
+export interface BotEnv extends AgentEnv {
   TELEGRAM_BOT_TOKEN: string;
   ALLOWED_CHAT_IDS: string;
 }

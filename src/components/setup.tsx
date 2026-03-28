@@ -7,17 +7,17 @@ interface SetupProps {
   onComplete: () => void;
 }
 
-type SetupMode = "choose" | "gateway" | "gateway-token" | "openrouter";
+type SetupMode = "choose" | "agent" | "agent-token" | "openrouter";
 
 export function Setup({ onComplete }: SetupProps) {
   const [mode, setMode] = useState<SetupMode>("choose");
   const [value, setValue] = useState("");
-  const [gatewayUrl, setGatewayUrl] = useState("");
+  const [agentUrl, setAgentUrl] = useState("");
 
   const handleChoose = (input: string) => {
     const trimmed = input.trim().toLowerCase();
-    if (trimmed === "1" || trimmed === "gateway") {
-      setMode("gateway");
+    if (trimmed === "1" || trimmed === "agent") {
+      setMode("agent");
       setValue("");
     } else if (trimmed === "2" || trimmed === "direct") {
       setMode("openrouter");
@@ -25,19 +25,19 @@ export function Setup({ onComplete }: SetupProps) {
     }
   };
 
-  const handleGatewayUrl = (input: string) => {
+  const handleAgentUrl = (input: string) => {
     const trimmed = input.trim();
     if (!trimmed) return;
-    setGatewayUrl(trimmed);
-    setSecret("gateway_url", trimmed);
-    setMode("gateway-token");
+    setAgentUrl(trimmed);
+    setSecret("agent_url", trimmed);
+    setMode("agent-token");
     setValue("");
   };
 
-  const handleGatewayToken = (input: string) => {
+  const handleAgentToken = (input: string) => {
     const trimmed = input.trim();
     if (trimmed) {
-      setSecret("gateway_token", trimmed);
+      setSecret("agent_token", trimmed);
     }
     onComplete();
   };
@@ -60,7 +60,7 @@ export function Setup({ onComplete }: SetupProps) {
         <>
           <Text>Choose your LLM provider:</Text>
           <Text> </Text>
-          <Text>  <Text bold>1</Text> — Gateway Worker (recommended for deployment)</Text>
+          <Text>  <Text bold>1</Text> — Agent Worker (recommended for deployment)</Text>
           <Text>  <Text bold>2</Text> — Direct OpenRouter (local development)</Text>
           <Text> </Text>
           <Box>
@@ -77,31 +77,31 @@ export function Setup({ onComplete }: SetupProps) {
         </>
       )}
 
-      {mode === "gateway" && (
+      {mode === "agent" && (
         <>
-          <Text>Enter your SCAF LLM Gateway Worker URL:</Text>
+          <Text>Enter your SCAF Agent Worker URL:</Text>
           <Text> </Text>
           <Box>
             <Text bold color="cyan">
-              Gateway URL:{" "}
+              Agent URL:{" "}
             </Text>
             <TextInput
               value={value}
               onChange={setValue}
-              onSubmit={handleGatewayUrl}
-              placeholder="https://scaf-llm-gateway.your-account.workers.dev"
+              onSubmit={handleAgentUrl}
+              placeholder="https://scaf-agent.your-account.workers.dev"
             />
           </Box>
         </>
       )}
 
-      {mode === "gateway-token" && (
+      {mode === "agent-token" && (
         <>
           <Text>
-            Gateway URL set to: <Text color="green">{gatewayUrl}</Text>
+            Agent URL set to: <Text color="green">{agentUrl}</Text>
           </Text>
           <Text> </Text>
-          <Text>Enter gateway auth token (press Enter to skip if none):</Text>
+          <Text>Enter agent auth token (press Enter to skip if none):</Text>
           <Text> </Text>
           <Box>
             <Text bold color="cyan">
@@ -110,7 +110,7 @@ export function Setup({ onComplete }: SetupProps) {
             <TextInput
               value={value}
               onChange={setValue}
-              onSubmit={handleGatewayToken}
+              onSubmit={handleAgentToken}
               mask="*"
             />
           </Box>

@@ -1,0 +1,32 @@
+{
+  "name": "scaf-agent",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-03-27",
+  "compatibility_flags": ["nodejs_compat"],
+  "rules": [
+    { "type": "Text", "globs": ["**/*.md"], "fallthrough": true }
+  ],
+
+  // Cron trigger: every minute
+  "triggers": {
+    "crons": ["* * * * *"]
+  },
+
+  // Single KV namespace for memory (memory:*) and schedules (schedule:*)
+  "kv_namespaces": [
+    { "binding": "AGENT_KV", "id": "c957d678da6e4a53aedd6bc5522a1901" }
+  ],
+
+  // Service binding to LLM gateway
+  "services": [
+    { "binding": "LLM_GATEWAY", "service": "scaf-llm-gateway" }
+  ],
+
+  // Set via `wrangler secret put`:
+  //   AGENT_TOKEN (optional, for authenticating CLI requests)
+  //   TELEGRAM_BOT_TOKEN
+
+  "vars": {
+    "DEFAULT_CHAT_ID": "8763462299"
+  }
+}

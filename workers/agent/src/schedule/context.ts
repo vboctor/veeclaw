@@ -1,5 +1,5 @@
 import type { ScheduleEntry } from "@scaf/shared";
-import type { SchedulerClient } from "./scheduler-client.ts";
+import { listSchedules } from "./store.ts";
 
 const SCHEDULE_KEYWORDS = [
   "schedule",
@@ -60,14 +60,13 @@ export function formatScheduleContext(entries: ScheduleEntry[]): string {
 
 /**
  * Load schedule context if the message is schedule-related.
- * Calls the scheduler worker via service binding.
  */
 export async function loadScheduleContext(
-  scheduler: SchedulerClient,
+  kv: KVNamespace,
   userMessage: string
 ): Promise<string | null> {
   if (!isScheduleRelated(userMessage)) return null;
-  const entries = await scheduler.list();
+  const entries = await listSchedules(kv);
   return formatScheduleContext(entries);
 }
 
