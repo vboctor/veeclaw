@@ -1,0 +1,21 @@
+{
+  "default": true,
+
+  // Allow long lines — markdown content like tables and URLs shouldn't wrap
+  "MD013": false,
+
+  // Allow inline HTML (useful for badges, details/summary, etc.)
+  "MD033": false,
+
+  // Allow duplicate headings in different sections (e.g. ## Setup in multiple docs)
+  "MD024": { "siblings_only": true },
+
+  // Allow trailing punctuation in headings (e.g. "What is SCAF?")
+  "MD026": false,
+
+  // Allow multiple top-level headings (some files like CHANGELOG need them)
+  "MD025": false,
+
+  // Allow compact table pipe style (no spaces around pipes)
+  "MD060": false
+}

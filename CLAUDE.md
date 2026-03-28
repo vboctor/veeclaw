@@ -1,3 +1,5 @@
+# SCAF Development Guide
+
 Use Bun instead of Node.js, npm, pnpm, or vite.
 
 - Use `bun <file>` instead of `node <file>` or `ts-node <file>`
@@ -17,7 +19,7 @@ SCAF (Serverless Cloud Agent Framework) — CLI & LLM Gateway.
 
 ## Structure
 
-```
+```text
 src/                          — CLI TUI
   index.tsx                   — Entry point
   app.tsx                     — Root Ink component (chat layout)

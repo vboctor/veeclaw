@@ -3,6 +3,9 @@
   "main": "src/index.ts",
   "compatibility_date": "2025-03-27",
   "compatibility_flags": ["nodejs_compat"],
+  "rules": [
+    { "type": "Text", "globs": ["**/*.md"], "fallthrough": true }
+  ],
   "kv_namespaces": [
     { "binding": "MEMORY_KV", "id": "c957d678da6e4a53aedd6bc5522a1901" }
   ]

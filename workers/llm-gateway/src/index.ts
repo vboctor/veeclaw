@@ -6,6 +6,7 @@ import type {
 import { loadMemory, injectMemory } from "./memory/load.ts";
 import { appendToWorkingMemory } from "./memory/update.ts";
 import { extractFacts } from "./memory/extract.ts";
+import SYSTEM_PROMPT from "./prompts/system.md";
 
 interface Env {
   OPENROUTER_API_KEY: string;
@@ -15,6 +16,13 @@ interface Env {
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const DEFAULT_MODEL = "anthropic/claude-haiku-4.5";
+
+function applySystemPrompt(req: CompletionRequest): CompletionRequest {
+  const system = req.system
+    ? `${SYSTEM_PROMPT}\n\n---\n\n${req.system}`
+    : SYSTEM_PROMPT;
+  return { ...req, system };
+}
 
 function buildMessages(req: CompletionRequest): Message[] {
   const msgs: Message[] = [];
@@ -65,9 +73,10 @@ async function handleComplete(
 ): Promise<Response> {
   const model = req.model ?? DEFAULT_MODEL;
   const userMessage = getLastUserMessage(req);
+  const withPrompt = applySystemPrompt(req);
 
   const memory = await loadMemory(env.MEMORY_KV);
-  const enriched = injectMemory(req, memory);
+  const enriched = injectMemory(withPrompt, memory);
 
   const response = await fetch(OPENROUTER_URL, {
     method: "POST",
@@ -158,9 +167,10 @@ async function handleStream(
 ): Promise<Response> {
   const model = req.model ?? DEFAULT_MODEL;
   const userMessage = getLastUserMessage(req);
+  const withPrompt = applySystemPrompt(req);
 
   const memory = await loadMemory(env.MEMORY_KV);
-  const enriched = injectMemory(req, memory);
+  const enriched = injectMemory(withPrompt, memory);
 
   const response = await fetch(OPENROUTER_URL, {
     method: "POST",

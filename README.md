@@ -2,7 +2,7 @@
 
 A modular, provider-agnostic LLM framework with a terminal chat interface, a Cloudflare Worker gateway with 3-tier memory, and a Telegram bot — all powered by Bun and TypeScript.
 
-```
+```text
                       CLI TUI (Ink/React)
                             │
 Telegram Bot ───┐           │
@@ -21,7 +21,7 @@ Telegram Bot ───┐           │
 
 ## Project Structure
 
-```
+```text
 src/                          CLI TUI
   app.tsx                     Root chat component
   components/                 Ink UI components
@@ -107,6 +107,7 @@ wrangler deploy
 ```
 
 **Routes:**
+
 - `POST /v1/complete` — non-streaming completion
 - `POST /v1/stream` — streaming completion (SSE)
 
@@ -142,7 +143,7 @@ wrangler secret put LLM_GATEWAY_TOKEN    # optional, must match gateway's GATEWA
 wrangler deploy
 ```
 
-3. Register the webhook with Telegram:
+1. Register the webhook with Telegram:
 
 ```bash
 curl -X POST "https://api.telegram.org/bot<TOKEN>/setWebhook" \
@@ -154,6 +155,7 @@ curl -X POST "https://api.telegram.org/bot<TOKEN>/setWebhook" \
 ```
 
 **Bot commands:**
+
 - `/start` — Welcome message
 - `/help` — List commands
 - `/model <name>` — Switch model for this chat
