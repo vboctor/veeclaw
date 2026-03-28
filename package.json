@@ -11,7 +11,10 @@
     "dev": "bun --watch run src/index.tsx",
     "test": "bun test",
     "dev:gateway": "cd workers/llm-gateway && bunx wrangler dev",
-    "deploy:gateway": "cd workers/llm-gateway && bunx wrangler deploy"
+    "deploy:gateway": "cd workers/llm-gateway && bunx wrangler deploy",
+    "dev:telegram": "cd workers/telegram-gateway && bunx wrangler dev",
+    "deploy:telegram": "cd workers/telegram-gateway && bunx wrangler deploy",
+    "deploy": "bun run deploy:gateway && bun run deploy:telegram"
   },
   "devDependencies": {
     "@types/bun": "latest",

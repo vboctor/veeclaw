@@ -1,0 +1,21 @@
+{
+  "name": "scaf-telegram-gateway",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-03-27",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // Set via `wrangler secret put`:
+  //   TELEGRAM_BOT_TOKEN
+  //   TELEGRAM_WEBHOOK_SECRET
+  //   LLM_GATEWAY_TOKEN (optional)
+
+  "vars": {
+    "LLM_GATEWAY_URL": "https://scaf-llm-gateway.vboctor.workers.dev",
+    "ALLOWED_CHAT_IDS": ""
+  },
+
+  // Service binding for Worker-to-Worker calls (avoids 1042 errors)
+  "services": [
+    { "binding": "LLM_GATEWAY", "service": "scaf-llm-gateway" }
+  ]
+}

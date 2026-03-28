@@ -18,12 +18,16 @@ SCAF (Serverless Cloud Agent Framework) — CLI & LLM Gateway.
 ## Structure
 
 ```
-src/
-  index.tsx          — Entry point
-  app.tsx            — Root Ink component (chat layout)
-  components/        — Ink UI components
-  llm/               — LLM Gateway (types, gateway factory, providers)
-  secrets/           — Secrets management (~/.scaf/secrets.json)
+src/                          — CLI TUI
+  index.tsx                   — Entry point
+  app.tsx                     — Root Ink component (chat layout)
+  components/                 — Ink UI components
+  llm/                        — LLM Gateway (types, gateway factory, providers)
+  secrets/                    — Secrets management (~/.scaf/secrets.json)
+packages/shared/              — Shared types (@scaf/shared)
+workers/
+  llm-gateway/                — Cloudflare Worker — LLM proxy + memory
+  telegram-gateway/           — Cloudflare Worker — Telegram bot
 ```
 
 ## Commands
@@ -31,3 +35,8 @@ src/
 - `bun run start` — Launch the TUI
 - `bun run dev` — Launch with --watch
 - `bun test` — Run tests
+- `bun run dev:gateway` — Run LLM gateway locally
+- `bun run dev:telegram` — Run Telegram gateway locally
+- `bun run deploy` — Deploy all workers to Cloudflare
+- `bun run deploy:gateway` — Deploy LLM gateway only
+- `bun run deploy:telegram` — Deploy Telegram gateway only

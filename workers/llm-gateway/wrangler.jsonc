@@ -4,6 +4,6 @@
   "compatibility_date": "2025-03-27",
   "compatibility_flags": ["nodejs_compat"],
   "kv_namespaces": [
-    { "binding": "MEMORY_KV", "id": "PLACEHOLDER" }
+    { "binding": "MEMORY_KV", "id": "c957d678da6e4a53aedd6bc5522a1901" }
   ]
 }
