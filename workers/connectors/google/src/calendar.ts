@@ -1,5 +1,5 @@
 import type { Env } from "./auth.ts";
-import { googleJson } from "./google-fetch.ts";
+import { googleFetch, googleJson } from "./google-fetch.ts";
 
 const CALENDAR_BASE = "https://www.googleapis.com/calendar/v3";
 
@@ -138,4 +138,26 @@ export async function handleCalendarUpdate(env: Env, request: Request): Promise<
   if (error) return error;
 
   return Response.json(data);
+}
+
+export async function handleCalendarDelete(env: Env, request: Request): Promise<Response> {
+  const { eventId, calendarId = "primary" } = (await request.json()) as {
+    eventId: string;
+    calendarId?: string;
+  };
+
+  if (!eventId) return Response.json({ error: "eventId is required" }, { status: 400 });
+
+  const res = await googleFetch(
+    env,
+    `${CALENDAR_BASE}/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`,
+    { method: "DELETE" },
+  );
+
+  if (!res.ok) {
+    const text = await res.text();
+    return Response.json({ error: text, status: res.status }, { status: res.status });
+  }
+
+  return Response.json({ deleted: true, eventId });
 }

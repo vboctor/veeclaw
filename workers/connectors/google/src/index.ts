@@ -11,6 +11,7 @@ import {
   handleCalendarGet,
   handleCalendarCreate,
   handleCalendarUpdate,
+  handleCalendarDelete,
 } from "./calendar.ts";
 import {
   handleDriveList,
@@ -42,6 +43,7 @@ export default {
       case "/v1/calendar/get":    return handleCalendarGet(env, request);
       case "/v1/calendar/create": return handleCalendarCreate(env, request);
       case "/v1/calendar/update": return handleCalendarUpdate(env, request);
+      case "/v1/calendar/delete": return handleCalendarDelete(env, request);
 
       // Drive
       case "/v1/drive/list":     return handleDriveList(env, request);

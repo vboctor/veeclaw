@@ -11,6 +11,7 @@ export const GOOGLE_TOOL_ROUTES: Record<string, string> = {
   calendar_get: "/v1/calendar/get",
   calendar_create: "/v1/calendar/create",
   calendar_update: "/v1/calendar/update",
+  calendar_delete: "/v1/calendar/delete",
   drive_list: "/v1/drive/list",
   drive_search: "/v1/drive/search",
   drive_get: "/v1/drive/get",
@@ -169,6 +170,22 @@ export const GOOGLE_TOOLS: Tool[] = [
           },
         },
         required: ["eventId", "updates"],
+      },
+    },
+  },
+
+  {
+    type: "function",
+    function: {
+      name: "calendar_delete",
+      description: "Delete a Google Calendar event",
+      parameters: {
+        type: "object",
+        properties: {
+          eventId: { type: "string", description: "Calendar event ID" },
+          calendarId: { type: "string", description: "Calendar ID (default 'primary')" },
+        },
+        required: ["eventId"],
       },
     },
   },
