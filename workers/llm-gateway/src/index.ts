@@ -80,6 +80,7 @@ async function handleComplete(
     body: JSON.stringify({
       model,
       messages: buildMessages(enriched),
+      plugins: [{ id: "web" }],
       stream: false,
     }),
   });
@@ -172,6 +173,7 @@ async function handleStream(
     body: JSON.stringify({
       model,
       messages: buildMessages(enriched),
+      plugins: [{ id: "web" }],
       stream: true,
     }),
   });
