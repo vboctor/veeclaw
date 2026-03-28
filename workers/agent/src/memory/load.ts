@@ -1,22 +1,23 @@
-import type { CompletionRequest, Message } from "@scaf/shared";
-import type { LoadedMemory } from "./types.ts";
-import { getWorkingMemory, getSummary, getFacts } from "./store.ts";
+import type { CompletionRequest } from "@scaf/shared";
+import type { LoadedMemory, MemoryData } from "./types.ts";
+import { loadMemoryData } from "./store.ts";
+
+export { loadMemoryData };
 
 export async function loadMemory(kv: KVNamespace): Promise<LoadedMemory> {
-  const [messages, summary, facts] = await Promise.all([
-    getWorkingMemory(kv),
-    getSummary(kv),
-    getFacts(kv),
-  ]);
+  const data = await loadMemoryData(kv);
+  return toLoadedMemory(data);
+}
 
+export function toLoadedMemory(data: MemoryData): LoadedMemory {
   return {
-    messages,
-    summaryBlock: summary,
-    factsBlock: facts,
+    messages: data.working,
+    summaryBlock: data.summary || null,
+    factsBlock: data.facts || null,
   };
 }
 
-function formatWorkingMemoryBlock(messages: Message[]): string {
+function formatWorkingMemoryBlock(messages: { role: string; content: string }[]): string {
   return messages.map((m) => `${m.role}: ${m.content}`).join("\n");
 }
 
@@ -40,9 +41,6 @@ export function injectMemory(
     );
   }
 
-  // Inject working memory as context in the system prompt, not as messages.
-  // The client already sends its own conversation history in messages —
-  // injecting as messages causes duplication and the model re-answers old questions.
   if (memory.messages.length > 0) {
     systemParts.push(
       `## Recent conversation (prior session)\n${formatWorkingMemoryBlock(memory.messages)}`

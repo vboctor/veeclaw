@@ -2,12 +2,16 @@ import type { ScheduleEntry } from "@scaf/shared";
 import { CronExpressionParser } from "cron-parser";
 import type { Env } from "../index.ts";
 import { dispatchScheduleEntry } from "./dispatch.ts";
-import { loadAll, saveAll } from "./store.ts";
+import { loadAll, saveAll, getNextRun } from "./store.ts";
 
 export async function runHeartbeat(env: Env): Promise<void> {
   const now = Date.now();
 
-  // Single KV read for all schedules
+  // Fast path: 1 read to check if anything is due
+  const nextRun = await getNextRun(env.AGENT_KV);
+  if (nextRun !== null && nextRun > now) return;
+
+  // Something may be due (or no sentinel yet) — do full scan
   const entries = await loadAll(env.AGENT_KV);
   const ids = Object.keys(entries);
   if (ids.length === 0) return;

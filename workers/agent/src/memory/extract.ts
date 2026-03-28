@@ -1,19 +1,23 @@
 import type { CompletionRequest, CompletionResponse } from "@scaf/shared";
 import { MEMORY_MODEL, DEFAULT_MEMORY_CONFIG } from "./types.ts";
-import { getFacts, putFacts } from "./store.ts";
+import type { MemoryData } from "./types.ts";
 import {
   mergeFacts,
   trimFactsToTokenBudget,
   markStaleFacts,
 } from "./utils.ts";
 
+/**
+ * Extract facts from a conversation turn and merge into existing facts.
+ * Mutates and returns the MemoryData — caller is responsible for saving.
+ */
 export async function extractFacts(
-  kv: KVNamespace,
+  data: MemoryData,
   llmGateway: Fetcher,
   userMessage: string,
   assistantResponse: string
-): Promise<void> {
-  const existingFacts = (await getFacts(kv)) ?? "";
+): Promise<MemoryData> {
+  const existingFacts = data.facts || "";
 
   const req: CompletionRequest = {
     model: MEMORY_MODEL,
@@ -43,15 +47,16 @@ Rules:
     body: JSON.stringify(req),
   });
 
-  if (!res.ok) return;
+  if (!res.ok) return data;
 
-  const data = (await res.json()) as CompletionResponse;
-  const newFacts = data.content?.trim();
-  if (!newFacts || newFacts === "(none)") return;
+  const result = (await res.json()) as CompletionResponse;
+  const newFacts = result.content?.trim();
+  if (!newFacts || newFacts === "(none)") return data;
 
   let merged = mergeFacts(existingFacts, newFacts);
   merged = markStaleFacts(merged, DEFAULT_MEMORY_CONFIG.staleDays);
   merged = trimFactsToTokenBudget(merged, DEFAULT_MEMORY_CONFIG.factsMaxTokens);
 
-  await putFacts(kv, merged);
+  data.facts = merged;
+  return data;
 }

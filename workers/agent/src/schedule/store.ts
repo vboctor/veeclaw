@@ -2,6 +2,7 @@ import type { ScheduleEntry, PromptScheduleEntry } from "@scaf/shared";
 import { CronExpressionParser } from "cron-parser";
 
 const SCHEDULES_KEY = "schedules";
+const NEXT_RUN_KEY = "schedule:next_run";
 
 async function loadAll(kv: KVNamespace): Promise<Record<string, ScheduleEntry>> {
   const raw = await kv.get(SCHEDULES_KEY);
@@ -10,9 +11,28 @@ async function loadAll(kv: KVNamespace): Promise<Record<string, ScheduleEntry>> 
 
 async function saveAll(kv: KVNamespace, entries: Record<string, ScheduleEntry>): Promise<void> {
   await kv.put(SCHEDULES_KEY, JSON.stringify(entries));
+  await updateNextRun(kv, entries);
 }
 
-export { loadAll, saveAll, SCHEDULES_KEY };
+async function updateNextRun(kv: KVNamespace, entries: Record<string, ScheduleEntry>): Promise<void> {
+  const values = Object.values(entries);
+  if (values.length === 0) {
+    await kv.delete(NEXT_RUN_KEY);
+    return;
+  }
+  const soonest = values.reduce(
+    (min, e) => (e.nextRun < min ? e.nextRun : min),
+    Infinity,
+  );
+  await kv.put(NEXT_RUN_KEY, String(soonest));
+}
+
+async function getNextRun(kv: KVNamespace): Promise<number | null> {
+  const raw = await kv.get(NEXT_RUN_KEY);
+  return raw ? Number(raw) : null;
+}
+
+export { loadAll, saveAll, getNextRun, SCHEDULES_KEY };
 
 export async function listSchedules(
   kv: KVNamespace

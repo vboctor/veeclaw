@@ -1,17 +1,20 @@
-import type { Message, CompletionRequest, CompletionResponse } from "@scaf/shared";
+import type { CompletionRequest, CompletionResponse } from "@scaf/shared";
 import { MEMORY_MODEL } from "./types.ts";
-import { getSummary, putSummary, putWorkingMemory } from "./store.ts";
+import type { MemoryData } from "./types.ts";
 
+/**
+ * Summarize the older half of working memory into the summary block.
+ * Mutates and returns the MemoryData — caller is responsible for saving.
+ */
 export async function maybeSummarize(
-  kv: KVNamespace,
+  data: MemoryData,
   llmGateway: Fetcher,
-  working: Message[]
-): Promise<void> {
-  const mid = Math.floor(working.length / 2);
-  const toSummarize = working.slice(0, mid);
-  const toKeep = working.slice(mid);
+): Promise<MemoryData> {
+  const mid = Math.floor(data.working.length / 2);
+  const toSummarize = data.working.slice(0, mid);
+  const toKeep = data.working.slice(mid);
 
-  const existingSummary = (await getSummary(kv)) ?? "";
+  const existingSummary = data.summary || "";
 
   const conversationText = toSummarize
     .map((m) => `${m.role}: ${m.content}`)
@@ -34,11 +37,13 @@ export async function maybeSummarize(
     body: JSON.stringify(req),
   });
 
-  if (!res.ok) return;
+  if (!res.ok) return data;
 
-  const data = (await res.json()) as CompletionResponse;
-  const summary = data.content;
-  if (!summary) return;
+  const result = (await res.json()) as CompletionResponse;
+  const summary = result.content;
+  if (!summary) return data;
 
-  await Promise.all([putSummary(kv, summary), putWorkingMemory(kv, toKeep)]);
+  data.summary = summary;
+  data.working = toKeep;
+  return data;
 }

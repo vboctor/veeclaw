@@ -4,7 +4,9 @@ import type {
   Message,
   ScheduleEntry,
 } from "@scaf/shared";
-import { loadMemory, injectMemory } from "./memory/load.ts";
+import { loadMemory, loadMemoryData } from "./memory/load.ts";
+import { injectMemory } from "./memory/load.ts";
+import { saveMemoryData } from "./memory/store.ts";
 import { appendToWorkingMemory } from "./memory/update.ts";
 import { extractFacts } from "./memory/extract.ts";
 import { loadScheduleContext } from "./schedule/context.ts";
@@ -79,10 +81,11 @@ async function processMemoryInBackground(
   assistantResponse: string
 ): Promise<void> {
   try {
-    await Promise.all([
-      appendToWorkingMemory(kv, llmGateway, userMessage, assistantResponse),
-      extractFacts(kv, llmGateway, userMessage, assistantResponse),
-    ]);
+    // Single KV read, sequential updates, single KV write
+    let data = await loadMemoryData(kv);
+    data = await appendToWorkingMemory(data, llmGateway, userMessage, assistantResponse);
+    data = await extractFacts(data, llmGateway, userMessage, assistantResponse);
+    await saveMemoryData(kv, data);
   } catch {
     // Memory ops are best-effort — never break the primary flow
   }

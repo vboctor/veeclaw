@@ -7,7 +7,8 @@ import type {
   ActionScheduleEntry,
 } from "@scaf/shared";
 import type { Env } from "../index.ts";
-import { loadMemory, injectMemory } from "../memory/load.ts";
+import { loadMemory, loadMemoryData, injectMemory } from "../memory/load.ts";
+import { saveMemoryData } from "../memory/store.ts";
 import { appendToWorkingMemory } from "../memory/update.ts";
 import { extractFacts } from "../memory/extract.ts";
 import {
@@ -169,20 +170,12 @@ async function dispatchPrompt(
     );
   }
 
-  const memoryTask = Promise.all([
-    appendToWorkingMemory(
-      env.AGENT_KV,
-      env.LLM_GATEWAY,
-      entry.event.content,
-      cleanContent
-    ),
-    extractFacts(
-      env.AGENT_KV,
-      env.LLM_GATEWAY,
-      entry.event.content,
-      cleanContent
-    ),
-  ]).catch(() => {});
+  const memoryTask = (async () => {
+    let data = await loadMemoryData(env.AGENT_KV);
+    data = await appendToWorkingMemory(data, env.LLM_GATEWAY, entry.event.content, cleanContent);
+    data = await extractFacts(data, env.LLM_GATEWAY, entry.event.content, cleanContent);
+    await saveMemoryData(env.AGENT_KV, data);
+  })().catch(() => {});
   ctx ? ctx.waitUntil(memoryTask) : await memoryTask;
 }
 
