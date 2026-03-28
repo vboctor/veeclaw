@@ -1,0 +1,12 @@
+{
+  "name": "scaf-scheduler",
+  "private": true,
+  "dependencies": {
+    "@scaf/shared": "workspace:*",
+    "cron-parser": "^5.0.6"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250312.0",
+    "wrangler": "^4"
+  }
+}

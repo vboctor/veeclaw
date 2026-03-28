@@ -28,8 +28,9 @@ src/                          — CLI TUI
   secrets/                    — Secrets management (~/.scaf/secrets.json)
 packages/shared/              — Shared types (@scaf/shared)
 workers/
-  llm-gateway/                — Cloudflare Worker — LLM proxy + memory
+  llm-gateway/                — Cloudflare Worker — LLM proxy + memory + schedule management
   telegram-gateway/           — Cloudflare Worker — Telegram bot
+  scheduler/                  — Cloudflare Worker — Heartbeat cron (*/5 * * * *)
 ```
 
 ## Commands
@@ -39,6 +40,8 @@ workers/
 - `bun test` — Run tests
 - `bun run dev:gateway` — Run LLM gateway locally
 - `bun run dev:telegram` — Run Telegram gateway locally
+- `bun run dev:scheduler` — Run scheduler locally
 - `bun run deploy` — Deploy all workers to Cloudflare
 - `bun run deploy:gateway` — Deploy LLM gateway only
 - `bun run deploy:telegram` — Deploy Telegram gateway only
+- `bun run deploy:scheduler` — Deploy scheduler only

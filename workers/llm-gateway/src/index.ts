@@ -6,21 +6,30 @@ import type {
 import { loadMemory, injectMemory } from "./memory/load.ts";
 import { appendToWorkingMemory } from "./memory/update.ts";
 import { extractFacts } from "./memory/extract.ts";
+import { SchedulerClient } from "./schedule/scheduler-client.ts";
+import { loadScheduleContext } from "./schedule/context.ts";
+import {
+  extractScheduleCommands,
+  processScheduleCommands,
+} from "./schedule/extract.ts";
 import SYSTEM_PROMPT from "./prompts/system.md";
 
 interface Env {
   OPENROUTER_API_KEY: string;
   GATEWAY_TOKEN?: string;
   MEMORY_KV: KVNamespace;
+  SCHEDULER: Fetcher; // Service binding to scaf-scheduler
 }
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const DEFAULT_MODEL = "anthropic/claude-haiku-4.5";
 
 function applySystemPrompt(req: CompletionRequest): CompletionRequest {
-  const system = req.system
-    ? `${SYSTEM_PROMPT}\n\n---\n\n${req.system}`
-    : SYSTEM_PROMPT;
+  const now = new Date();
+  const timeContext = `Current datetime: ${now.toISOString()} (${now.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })} ${now.toLocaleTimeString("en-US", { hour12: true })})`;
+
+  const base = `${SYSTEM_PROMPT}\n\n${timeContext}`;
+  const system = req.system ? `${base}\n\n---\n\n${req.system}` : base;
   return { ...req, system };
 }
 
@@ -74,9 +83,19 @@ async function handleComplete(
   const model = req.model ?? DEFAULT_MODEL;
   const userMessage = getLastUserMessage(req);
   const withPrompt = applySystemPrompt(req);
+  const scheduler = new SchedulerClient(env.SCHEDULER);
 
   const memory = await loadMemory(env.MEMORY_KV);
-  const enriched = injectMemory(withPrompt, memory);
+  let scheduleContext: string | null = null;
+  try {
+    scheduleContext = await loadScheduleContext(scheduler, userMessage);
+  } catch {
+    // Schedule context is best-effort — never break the primary flow
+  }
+  let enriched = injectMemory(withPrompt, memory);
+  if (scheduleContext) {
+    enriched = injectScheduleContext(enriched, scheduleContext);
+  }
 
   const response = await fetch(OPENROUTER_URL, {
     method: "POST",
@@ -105,10 +124,19 @@ async function handleComplete(
     usage?: { prompt_tokens: number; completion_tokens: number };
   };
   const choice = data.choices?.[0];
-  const assistantResponse = choice?.message?.content ?? "";
+  const rawResponse = choice?.message?.content ?? "";
+
+  // Extract and process any schedule commands from the response
+  const { cleanContent, commands } = extractScheduleCommands(rawResponse);
+
+  if (commands.length > 0) {
+    ctx.waitUntil(
+      processScheduleCommands(scheduler, commands).catch(() => {})
+    );
+  }
 
   const result: CompletionResponse = {
-    content: assistantResponse,
+    content: cleanContent,
     model: data.model ?? model,
     usage: data.usage
       ? {
@@ -123,7 +151,7 @@ async function handleComplete(
       env.MEMORY_KV,
       env.OPENROUTER_API_KEY,
       userMessage,
-      assistantResponse
+      cleanContent
     )
   );
 
@@ -168,9 +196,19 @@ async function handleStream(
   const model = req.model ?? DEFAULT_MODEL;
   const userMessage = getLastUserMessage(req);
   const withPrompt = applySystemPrompt(req);
+  const scheduler = new SchedulerClient(env.SCHEDULER);
 
   const memory = await loadMemory(env.MEMORY_KV);
-  const enriched = injectMemory(withPrompt, memory);
+  let scheduleCtx: string | null = null;
+  try {
+    scheduleCtx = await loadScheduleContext(scheduler, userMessage);
+  } catch {
+    // Schedule context is best-effort — never break the primary flow
+  }
+  let enriched = injectMemory(withPrompt, memory);
+  if (scheduleCtx) {
+    enriched = injectScheduleContext(enriched, scheduleCtx);
+  }
 
   const response = await fetch(OPENROUTER_URL, {
     method: "POST",
@@ -193,18 +231,26 @@ async function handleStream(
     return new Response(text, { status: response.status });
   }
 
-  // Tee the stream: one for the client, one for memory extraction
+  // Tee the stream: one for the client, one for memory + schedule extraction
   const [clientStream, captureStream] = response.body!.tee();
 
   ctx.waitUntil(
-    collectStreamContent(captureStream).then((assistantResponse) =>
-      processMemoryInBackground(
-        env.MEMORY_KV,
-        env.OPENROUTER_API_KEY,
-        userMessage,
-        assistantResponse
-      )
-    )
+    collectStreamContent(captureStream).then(async (rawResponse) => {
+      const { cleanContent, commands } =
+        extractScheduleCommands(rawResponse);
+
+      await Promise.all([
+        processMemoryInBackground(
+          env.MEMORY_KV,
+          env.OPENROUTER_API_KEY,
+          userMessage,
+          cleanContent
+        ),
+        commands.length > 0
+          ? processScheduleCommands(scheduler, commands).catch(() => {})
+          : Promise.resolve(),
+      ]);
+    })
   );
 
   return new Response(clientStream, {
@@ -214,6 +260,16 @@ async function handleStream(
       Connection: "keep-alive",
     },
   });
+}
+
+function injectScheduleContext(
+  req: CompletionRequest,
+  scheduleContext: string
+): CompletionRequest {
+  const system = req.system
+    ? `${req.system}\n\n---\n\n${scheduleContext}`
+    : scheduleContext;
+  return { ...req, system };
 }
 
 export default {
@@ -230,17 +286,34 @@ export default {
       return new Response(null, {
         headers: {
           "Access-Control-Allow-Origin": "*",
-          "Access-Control-Allow-Methods": "POST, OPTIONS",
+          "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
           "Access-Control-Allow-Headers": "Content-Type, Authorization",
         },
       });
+    }
+
+    const url = new URL(request.url);
+
+    // Proxy schedule routes to the scheduler worker
+    if (url.pathname.startsWith("/v1/schedules")) {
+      try {
+        const schedulerPath = url.pathname.replace("/v1/schedules", "/schedules");
+        return await env.SCHEDULER.fetch(
+          new Request(`https://internal${schedulerPath}`, {
+            method: request.method,
+            headers: request.headers,
+            body: request.body,
+          })
+        );
+      } catch {
+        return new Response("Scheduler unavailable", { status: 502 });
+      }
     }
 
     if (request.method !== "POST") {
       return new Response("Method not allowed", { status: 405 });
     }
 
-    const url = new URL(request.url);
     let body: CompletionRequest;
 
     try {

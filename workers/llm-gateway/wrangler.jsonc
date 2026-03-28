@@ -8,5 +8,10 @@
   ],
   "kv_namespaces": [
     { "binding": "MEMORY_KV", "id": "c957d678da6e4a53aedd6bc5522a1901" }
+  ],
+
+  // Service binding to scheduler worker (for schedule CRUD)
+  "services": [
+    { "binding": "SCHEDULER", "service": "scaf-scheduler" }
   ]
 }

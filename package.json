@@ -14,7 +14,9 @@
     "deploy:gateway": "cd workers/llm-gateway && bunx wrangler deploy",
     "dev:telegram": "cd workers/telegram-gateway && bunx wrangler dev",
     "deploy:telegram": "cd workers/telegram-gateway && bunx wrangler deploy",
-    "deploy": "bun run deploy:gateway && bun run deploy:telegram"
+    "dev:scheduler": "cd workers/scheduler && bunx wrangler dev",
+    "deploy:scheduler": "cd workers/scheduler && bunx wrangler deploy",
+    "deploy": "bun run deploy:gateway && bun run deploy:telegram && bun run deploy:scheduler"
   },
   "devDependencies": {
     "@types/bun": "latest",

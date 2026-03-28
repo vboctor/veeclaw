@@ -1,0 +1,34 @@
+{
+	"name": "scaf-scheduler",
+	"main": "src/index.ts",
+	"compatibility_date": "2025-03-27",
+	"compatibility_flags": [
+		"nodejs_compat"
+	],
+	// Cron trigger: every 5 minutes
+	"triggers": {
+		"crons": [
+			"*/5 * * * *"
+		]
+	},
+	// KV namespace for schedule entries (owned exclusively by this worker)
+	"kv_namespaces": [
+		{
+			"binding": "SCHEDULER_KV",
+			"id": "ce0b8dcbd9cd4ed1a6dbfcd45be13bf4"
+		}
+	],
+	// Service binding to LLM gateway (for prompt-mode dispatch)
+	"services": [
+		{
+			"binding": "LLM_GATEWAY",
+			"service": "scaf-llm-gateway"
+		}
+	],
+	// Set via `wrangler secret put`:
+	//   TELEGRAM_BOT_TOKEN
+	//   LLM_GATEWAY_TOKEN (optional)
+	"vars": {
+		"DEFAULT_CHAT_ID": "8763462299"
+	}
+}
