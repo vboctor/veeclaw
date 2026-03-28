@@ -37,6 +37,17 @@
         "wrangler": "^4",
       },
     },
+    "workers/connectors/google": {
+      "name": "@scaf/google-connector",
+      "version": "0.1.0",
+      "dependencies": {
+        "@scaf/shared": "workspace:*",
+      },
+      "devDependencies": {
+        "@cloudflare/workers-types": "^4.20250312.0",
+        "wrangler": "^4",
+      },
+    },
     "workers/llm-gateway": {
       "name": "@scaf/llm-gateway",
       "version": "0.1.0",
@@ -203,6 +214,8 @@
     "@poppinss/exception": ["@poppinss/exception@1.2.3", "", {}, "sha512-dCED+QRChTVatE9ibtoaxc+WkdzOSjYTKi/+uacHWIsfodVfpsueo3+DKpgU5Px8qXjgmXkSvhXvSCz3fnP9lw=="],
 
     "@scaf/agent": ["@scaf/agent@workspace:workers/agent"],
+
+    "@scaf/google-connector": ["@scaf/google-connector@workspace:workers/connectors/google"],
 
     "@scaf/llm-gateway": ["@scaf/llm-gateway@workspace:workers/llm-gateway"],
 

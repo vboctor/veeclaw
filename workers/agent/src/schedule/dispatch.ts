@@ -1,6 +1,7 @@
 import type {
   CompletionRequest,
   CompletionResponse,
+  Message,
   ScheduleEntry,
   PromptScheduleEntry,
   ActionScheduleEntry,
@@ -13,6 +14,8 @@ import {
   extractScheduleCommands,
   processScheduleCommands,
 } from "./extract.ts";
+import { GOOGLE_TOOLS } from "../tools/google.ts";
+import { executeToolCalls } from "../tools/execute.ts";
 import SYSTEM_PROMPT from "../prompts/system.md";
 
 const TELEGRAM_API = "https://api.telegram.org";
@@ -87,25 +90,18 @@ export async function dispatchScheduleEntry(
   }
 }
 
-async function dispatchPrompt(
-  entry: PromptScheduleEntry,
+const MAX_TOOL_ROUNDS = 5;
+
+async function callLLMGateway(
   env: Env,
-  ctx?: ExecutionContext
-): Promise<void> {
-  const req: CompletionRequest = {
-    messages: [{ role: "user", content: entry.event.content }],
-  };
-
-  const withPrompt = applySystemPrompt(req);
-  const memory = await loadMemory(env.AGENT_KV);
-  const enriched = injectMemory(withPrompt, memory);
-
+  req: CompletionRequest,
+): Promise<CompletionResponse> {
   const response = await env.LLM_GATEWAY.fetch(
     "https://internal/v1/complete",
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(enriched),
+      body: JSON.stringify(req),
     }
   );
 
@@ -114,9 +110,48 @@ async function dispatchPrompt(
     throw new Error(`LLM gateway error: ${text}`);
   }
 
-  const data = (await response.json()) as CompletionResponse;
-  const rawResponse = data.content;
+  return (await response.json()) as CompletionResponse;
+}
 
+async function dispatchPrompt(
+  entry: PromptScheduleEntry,
+  env: Env,
+  ctx?: ExecutionContext
+): Promise<void> {
+  const req: CompletionRequest = {
+    system: `This is a scheduled task execution. After completing any actions (sending emails, creating events, etc.), always provide a brief confirmation of what was done. For example: "Sent email about <topic> to <address>" or "Created calendar event <title> for <date>".`,
+    messages: [{ role: "user", content: entry.event.content }],
+    tools: GOOGLE_TOOLS,
+  };
+
+  const withPrompt = applySystemPrompt(req);
+  const memory = await loadMemory(env.AGENT_KV);
+  const enriched = injectMemory(withPrompt, memory);
+
+  // Tool execution loop
+  let currentReq = enriched;
+  let data: CompletionResponse;
+
+  for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+    data = await callLLMGateway(env, currentReq);
+
+    if (!data.tool_calls?.length) break;
+
+    const toolResults = await executeToolCalls(data.tool_calls, env.GOOGLE_CONNECTOR);
+
+    const assistantMsg: Message = {
+      role: "assistant",
+      content: data.content || "",
+      tool_calls: data.tool_calls,
+    };
+
+    currentReq = {
+      ...currentReq,
+      messages: [...currentReq.messages, assistantMsg, ...toolResults],
+    };
+  }
+
+  const rawResponse = data!.content;
   const { cleanContent, commands } = extractScheduleCommands(rawResponse);
 
   if (commands.length > 0) {
@@ -163,6 +198,7 @@ async function dispatchAction(
       if (chatId) {
         await sendTelegram(env.TELEGRAM_BOT_TOKEN, chatId, action.text);
       }
+      // send_message actions are themselves user-visible — no extra confirmation needed
       break;
     }
 
@@ -180,8 +216,15 @@ async function dispatchAction(
           signal: controller.signal,
         });
         if (action.expect_status && res.status !== action.expect_status) {
-          console.error(
-            `[agent:dispatch:${entry.id}] HTTP ${res.status}, expected ${action.expect_status}`
+          const msg = `⚠️ **${entry.label}** — HTTP ${res.status} (expected ${action.expect_status})`;
+          if (env.DEFAULT_CHAT_ID) {
+            await sendTelegram(env.TELEGRAM_BOT_TOKEN, env.DEFAULT_CHAT_ID, msg);
+          }
+        } else if (env.DEFAULT_CHAT_ID) {
+          await sendTelegram(
+            env.TELEGRAM_BOT_TOKEN,
+            env.DEFAULT_CHAT_ID,
+            `✅ **${entry.label}** — completed (HTTP ${res.status})`
           );
         }
       } finally {

@@ -17,9 +17,10 @@
     { "binding": "AGENT_KV", "id": "f56cc23eb6bc40aca294bd1ac5a260f7" }
   ],
 
-  // Service binding to LLM gateway
+  // Service bindings
   "services": [
-    { "binding": "LLM_GATEWAY", "service": "scaf-llm-gateway" }
+    { "binding": "LLM_GATEWAY", "service": "scaf-llm-gateway" },
+    { "binding": "GOOGLE_CONNECTOR", "service": "scaf-google-connector" }
   ],
 
   // Set via `wrangler secret put` or `bun run setup`:

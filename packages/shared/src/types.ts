@@ -1,12 +1,26 @@
 export interface Message {
-  role: "system" | "user" | "assistant";
+  role: "system" | "user" | "assistant" | "tool";
   content: string;
+  tool_calls?: ToolCall[];
+  tool_call_id?: string;
+}
+
+export interface ToolCall {
+  id: string;
+  type: "function";
+  function: {
+    name: string;
+    arguments: string;
+  };
 }
 
 export interface Tool {
-  name: string;
-  description: string;
-  parameters: Record<string, unknown>;
+  type: "function";
+  function: {
+    name: string;
+    description: string;
+    parameters: Record<string, unknown>;
+  };
 }
 
 export interface CompletionRequest {
@@ -20,6 +34,7 @@ export interface CompletionRequest {
 export interface CompletionResponse {
   content: string;
   model: string;
+  tool_calls?: ToolCall[];
   usage?: { prompt_tokens: number; completion_tokens: number };
 }
 

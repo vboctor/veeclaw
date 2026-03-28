@@ -31,6 +31,7 @@ workers/
   agent/                      — Cloudflare Worker — Agent (memory, prompts, scheduling, dispatch)
   llm-gateway/                — Cloudflare Worker — LLM passthrough to OpenRouter (internal only)
   telegram-gateway/           — Cloudflare Worker — Telegram bot
+  connectors/google/          — Cloudflare Worker — Google Connector (Gmail, Calendar, Drive)
 ```
 
 ## Commands
@@ -45,5 +46,8 @@ workers/
 - `bun run deploy:agent` — Deploy Agent worker only
 - `bun run deploy:gateway` — Deploy LLM gateway only
 - `bun run deploy:telegram` — Deploy Telegram gateway only
+- `bun run dev:google` — Run Google connector locally
+- `bun run deploy:google` — Deploy Google connector only
+- `bun run google-auth` — OAuth2 browser flow to authorize Google access
 - `bun run setup` — Interactive setup: creates KV, deploys workers, pushes secrets, registers webhook
-- `bun run undeploy` — Tear down all workers, KV namespace, and Telegram webhook
+- `bun run undeploy` — Tear down all workers, KV namespaces, and Telegram webhook

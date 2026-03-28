@@ -22,12 +22,15 @@ import {
 } from "./schedule/store.ts";
 import { runHeartbeat } from "./schedule/heartbeat.ts";
 import { dispatchScheduleEntry } from "./schedule/dispatch.ts";
+import { GOOGLE_TOOLS } from "./tools/google.ts";
+import { executeToolCalls } from "./tools/execute.ts";
 import SYSTEM_PROMPT from "./prompts/system.md";
 
 export interface Env {
   AGENT_TOKEN?: string;
   AGENT_KV: KVNamespace;
   LLM_GATEWAY: Fetcher;
+  GOOGLE_CONNECTOR: Fetcher;
   TELEGRAM_BOT_TOKEN: string;
   DEFAULT_CHAT_ID: string;
 }
@@ -100,6 +103,8 @@ async function callLLMGateway(
 
 // ── Completion handlers ───────────────────────────────────────────
 
+const MAX_TOOL_ROUNDS = 5;
+
 async function handleComplete(
   req: CompletionRequest,
   env: Env,
@@ -120,16 +125,43 @@ async function handleComplete(
     enriched = injectScheduleContext(enriched, scheduleContext);
   }
 
-  const response = await callLLMGateway(env, enriched, false);
+  // Inject tools
+  enriched = { ...enriched, tools: GOOGLE_TOOLS };
 
-  if (!response.ok) {
-    const text = await response.text();
-    return new Response(text, { status: response.status });
+  // Tool execution loop
+  let currentReq = enriched;
+  let data: CompletionResponse;
+
+  for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
+    const response = await callLLMGateway(env, currentReq, false);
+
+    if (!response.ok) {
+      const text = await response.text();
+      return new Response(text, { status: response.status });
+    }
+
+    data = (await response.json()) as CompletionResponse;
+
+    // If no tool calls, we have the final response
+    if (!data.tool_calls?.length) break;
+
+    // Execute tool calls
+    const toolResults = await executeToolCalls(data.tool_calls, env.GOOGLE_CONNECTOR);
+
+    // Append assistant message (with tool_calls) and tool results to conversation
+    const assistantMsg: Message = {
+      role: "assistant",
+      content: data.content || "",
+      tool_calls: data.tool_calls,
+    };
+
+    currentReq = {
+      ...currentReq,
+      messages: [...currentReq.messages, assistantMsg, ...toolResults],
+    };
   }
 
-  const data = (await response.json()) as CompletionResponse;
-  const rawResponse = data.content;
-
+  const rawResponse = data!.content;
   const { cleanContent, commands } = extractScheduleCommands(rawResponse);
 
   if (commands.length > 0) {
@@ -139,8 +171,9 @@ async function handleComplete(
   }
 
   const result: CompletionResponse = {
-    ...data,
+    ...data!,
     content: cleanContent,
+    tool_calls: undefined,
   };
 
   ctx.waitUntil(

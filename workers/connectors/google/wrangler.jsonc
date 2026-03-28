@@ -1,0 +1,16 @@
+{
+  "name": "scaf-google-connector",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-03-27",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // KV for caching OAuth2 access tokens (55-min TTL)
+  "kv_namespaces": [
+    { "binding": "TOOL_CACHE", "id": "9c22b93c7bbd4bd4a496d5b17ce54b48" }
+  ]
+
+  // Set via `wrangler secret put` or `bun run setup`:
+  //   GOOGLE_CLIENT_ID
+  //   GOOGLE_CLIENT_SECRET
+  //   GOOGLE_REFRESH_TOKEN
+}

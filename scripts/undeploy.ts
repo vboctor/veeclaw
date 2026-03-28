@@ -72,8 +72,8 @@ async function main() {
 
   console.log("  This will delete:");
   console.log("    - Telegram webhook");
-  console.log("    - All 3 Cloudflare Workers");
-  console.log("    - KV namespace (AGENT_KV)");
+  console.log("    - All 4 Cloudflare Workers");
+  console.log("    - KV namespaces (AGENT_KV, TOOL_CACHE)");
   console.log("    - Local .dev.vars files");
   console.log("  ");
   console.log("  Your .env file will NOT be deleted.\n");
@@ -110,6 +110,7 @@ async function main() {
   const workers = [
     "scaf-telegram-gateway",
     "scaf-agent",
+    "scaf-google-connector",
     "scaf-llm-gateway",
   ];
 
@@ -137,14 +138,35 @@ async function main() {
   if (kvId) {
     const result = await run(["bun", "x", "wrangler", "kv", "namespace", "delete", "--namespace-id", kvId]);
     if (result.ok) {
-      log("DELETE", `KV namespace ${kvId}`);
+      log("DELETE", `KV namespace AGENT_KV (${kvId})`);
     } else if (result.stderr.includes("not found") || result.stdout.includes("not found")) {
       log("SKIP", `KV namespace ${kvId} (not found)`);
     } else {
       log("WARN", `Failed to delete KV namespace: ${result.stderr || result.stdout}`);
     }
   } else {
-    log("SKIP", "No KV namespace ID found in wrangler.jsonc");
+    log("SKIP", "No AGENT_KV namespace ID found in wrangler.jsonc");
+  }
+
+  // Delete TOOL_CACHE KV (Google Connector)
+  const googleWranglerPath = join(ROOT, "workers/connectors/google/wrangler.jsonc");
+  if (existsSync(googleWranglerPath)) {
+    const googleWranglerContent = readFileSync(googleWranglerPath, "utf-8");
+    const googleIdMatch = googleWranglerContent.match(/"binding":\s*"TOOL_CACHE",\s*"id":\s*"([^"]*)"/);
+    const googleKvId = googleIdMatch?.[1];
+
+    if (googleKvId) {
+      const result = await run(["bun", "x", "wrangler", "kv", "namespace", "delete", "--namespace-id", googleKvId]);
+      if (result.ok) {
+        log("DELETE", `KV namespace TOOL_CACHE (${googleKvId})`);
+      } else if (result.stderr.includes("not found") || result.stdout.includes("not found")) {
+        log("SKIP", `KV namespace ${googleKvId} (not found)`);
+      } else {
+        log("WARN", `Failed to delete TOOL_CACHE KV namespace: ${result.stderr || result.stdout}`);
+      }
+    } else {
+      log("SKIP", "No TOOL_CACHE namespace ID found in google connector wrangler.jsonc");
+    }
   }
 
   // ── Step 4: Clean local .dev.vars files ──────────────────────────────────
@@ -153,6 +175,7 @@ async function main() {
 
   const devVarsPaths = [
     "workers/llm-gateway/.dev.vars",
+    "workers/connectors/google/.dev.vars",
     "workers/agent/.dev.vars",
     "workers/telegram-gateway/.dev.vars",
   ];

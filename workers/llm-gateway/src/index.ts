@@ -2,6 +2,7 @@ import type {
   CompletionRequest,
   CompletionResponse,
   Message,
+  ToolCall,
 } from "@scaf/shared";
 
 interface Env {
@@ -11,12 +12,17 @@ interface Env {
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const DEFAULT_MODEL = "anthropic/claude-haiku-4.5";
 
-function buildMessages(req: CompletionRequest): Message[] {
-  const msgs: Message[] = [];
+function buildMessages(req: CompletionRequest): Record<string, unknown>[] {
+  const msgs: Record<string, unknown>[] = [];
   if (req.system) {
     msgs.push({ role: "system", content: req.system });
   }
-  msgs.push(...req.messages);
+  for (const msg of req.messages) {
+    const m: Record<string, unknown> = { role: msg.role, content: msg.content };
+    if (msg.tool_calls) m.tool_calls = msg.tool_calls;
+    if (msg.tool_call_id) m.tool_call_id = msg.tool_call_id;
+    msgs.push(m);
+  }
   return msgs;
 }
 
@@ -26,6 +32,17 @@ async function handleComplete(
 ): Promise<Response> {
   const model = req.model ?? DEFAULT_MODEL;
 
+  const payload: Record<string, unknown> = {
+    model,
+    messages: buildMessages(req),
+    plugins: [{ id: "web" }],
+    stream: false,
+  };
+
+  if (req.tools?.length) {
+    payload.tools = req.tools;
+  }
+
   const response = await fetch(OPENROUTER_URL, {
     method: "POST",
     headers: {
@@ -34,12 +51,7 @@ async function handleComplete(
       "HTTP-Referer": "https://github.com/vboctor/scaf",
       "X-Title": "SCAF",
     },
-    body: JSON.stringify({
-      model,
-      messages: buildMessages(req),
-      plugins: [{ id: "web" }],
-      stream: false,
-    }),
+    body: JSON.stringify(payload),
   });
 
   if (!response.ok) {
@@ -48,16 +60,18 @@ async function handleComplete(
   }
 
   const data = (await response.json()) as {
-    choices?: { message?: { content?: string } }[];
+    choices?: { message?: { content?: string; tool_calls?: ToolCall[] } }[];
     model?: string;
     usage?: { prompt_tokens: number; completion_tokens: number };
   };
   const choice = data.choices?.[0];
   const content = choice?.message?.content ?? "";
+  const tool_calls = choice?.message?.tool_calls;
 
   const result: CompletionResponse = {
     content,
     model: data.model ?? model,
+    tool_calls: tool_calls?.length ? tool_calls : undefined,
     usage: data.usage
       ? {
           prompt_tokens: data.usage.prompt_tokens,
@@ -75,6 +89,17 @@ async function handleStream(
 ): Promise<Response> {
   const model = req.model ?? DEFAULT_MODEL;
 
+  const payload: Record<string, unknown> = {
+    model,
+    messages: buildMessages(req),
+    plugins: [{ id: "web" }],
+    stream: true,
+  };
+
+  if (req.tools?.length) {
+    payload.tools = req.tools;
+  }
+
   const response = await fetch(OPENROUTER_URL, {
     method: "POST",
     headers: {
@@ -83,12 +108,7 @@ async function handleStream(
       "HTTP-Referer": "https://github.com/vboctor/scaf",
       "X-Title": "SCAF",
     },
-    body: JSON.stringify({
-      model,
-      messages: buildMessages(req),
-      plugins: [{ id: "web" }],
-      stream: true,
-    }),
+    body: JSON.stringify(payload),
   });
 
   if (!response.ok) {

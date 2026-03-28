@@ -27,17 +27,9 @@ export async function addSchedule(
   kv: KVNamespace,
   entry: ScheduleEntry
 ): Promise<void> {
-  const ttlOpts =
-    entry.type === "one-shot"
-      ? {
-          expirationTtl: Math.ceil((entry.nextRun - Date.now()) / 1000) + 3600,
-        }
-      : undefined;
-
   await kv.put(
     `${SCHEDULE_PREFIX}${entry.id}`,
     JSON.stringify(entry),
-    ttlOpts
   );
 }
 

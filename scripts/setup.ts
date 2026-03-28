@@ -100,10 +100,15 @@ function writeEnvFile(path: string, vars: Record<string, string>) {
 const REQUIRED_SECRETS = ["OPENROUTER_API_KEY", "TELEGRAM_BOT_TOKEN", "TELEGRAM_WEBHOOK_SECRET"] as const;
 const OPTIONAL_SECRETS = ["AGENT_TOKEN", "DEFAULT_CHAT_ID", "ALLOWED_CHAT_IDS"] as const;
 const AUTO_GENERATE = ["TELEGRAM_WEBHOOK_SECRET", "AGENT_TOKEN"] as const;
+const GOOGLE_SECRETS = ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_REFRESH_TOKEN"] as const;
 
 const WORKER_SECRETS: Record<string, { required: string[]; optional: string[] }> = {
   "scaf-llm-gateway": {
     required: ["OPENROUTER_API_KEY"],
+    optional: [],
+  },
+  "scaf-google-connector": {
+    required: ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_REFRESH_TOKEN"],
     optional: [],
   },
   "scaf-agent": {
@@ -118,6 +123,7 @@ const WORKER_SECRETS: Record<string, { required: string[]; optional: string[] }>
 
 const DEV_VARS: Record<string, string[]> = {
   "workers/llm-gateway": ["OPENROUTER_API_KEY"],
+  "workers/connectors/google": ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_REFRESH_TOKEN"],
   "workers/agent": ["TELEGRAM_BOT_TOKEN", "AGENT_TOKEN", "DEFAULT_CHAT_ID"],
   "workers/telegram-gateway": ["TELEGRAM_BOT_TOKEN", "TELEGRAM_WEBHOOK_SECRET", "AGENT_TOKEN", "ALLOWED_CHAT_IDS"],
 };
@@ -199,6 +205,26 @@ async function collectSecrets(): Promise<Record<string, string>> {
       vars[key] = val;
       changed = true;
     }
+  }
+
+  // Google Connector secrets
+  for (const key of GOOGLE_SECRETS) {
+    if (vars[key] && !FORCE) {
+      log("SKIP", `${key} (already set)`);
+      continue;
+    }
+
+    if (key === "GOOGLE_REFRESH_TOKEN") {
+      if (!vars[key]) {
+        log("INFO", `${key} not set — run 'bun run google-auth' to authorize with Google`);
+      }
+      continue;
+    }
+
+    const val = promptUser(`${key} (optional, press Enter to skip)`);
+    if (!val) continue;
+    vars[key] = val;
+    changed = true;
   }
 
   if (changed) {
@@ -284,6 +310,72 @@ async function ensureKVNamespace(): Promise<string | null> {
   return newId;
 }
 
+// ── Step 3b: Google Connector KV namespace ──────────────────────────────────
+
+async function ensureGoogleKVNamespace(): Promise<string | null> {
+  header("Google Connector KV Namespace");
+
+  const wranglerPath = join(ROOT, "workers/connectors/google/wrangler.jsonc");
+  const wranglerContent = readFileSync(wranglerPath, "utf-8");
+  const idMatch = wranglerContent.match(/"binding":\s*"TOOL_CACHE",\s*"id":\s*"([^"]*)"/);
+  const currentId = idMatch?.[1] ?? "";
+
+  const list = await run(["bun", "x", "wrangler", "kv", "namespace", "list"]);
+  if (!list.ok) {
+    log("WARN", `Failed to list KV namespaces: ${list.stderr}`);
+    return null;
+  }
+
+  let namespaces: Array<{ id: string; title: string }> = [];
+  try {
+    namespaces = JSON.parse(list.stdout);
+  } catch {
+    log("WARN", "Failed to parse KV namespace list");
+    return null;
+  }
+
+  const existing = namespaces.find((ns) => ns.id === currentId);
+  if (existing && !FORCE) {
+    log("SKIP", `KV namespace exists: ${existing.title} (${existing.id})`);
+    return existing.id;
+  }
+
+  const byTitle = namespaces.find((ns) => ns.title.includes("TOOL_CACHE"));
+  if (byTitle && !FORCE) {
+    log("OK", `Found existing KV namespace: ${byTitle.title} (${byTitle.id})`);
+    if (byTitle.id !== currentId) {
+      const updated = wranglerContent.replace(
+        /("binding":\s*"TOOL_CACHE",\s*"id":\s*")[^"]*/,
+        `$1${byTitle.id}`,
+      );
+      writeFileSync(wranglerPath, updated);
+      log("UPDATE", `wrangler.jsonc updated with KV ID: ${byTitle.id}`);
+    }
+    return byTitle.id;
+  }
+
+  const create = await run(["bun", "x", "wrangler", "kv", "namespace", "create", "TOOL_CACHE"]);
+  if (!create.ok) {
+    log("WARN", `Failed to create KV namespace: ${create.stderr}`);
+    return null;
+  }
+
+  const newIdMatch = create.stdout.match(/"id":\s*"([^"]+)"/);
+  if (!newIdMatch) {
+    log("WARN", `Could not parse KV namespace ID from output:\n${create.stdout}`);
+    return null;
+  }
+
+  const newId = newIdMatch[1];
+  const updated = wranglerContent.replace(
+    /("binding":\s*"TOOL_CACHE",\s*"id":\s*")[^"]*/,
+    `$1${newId}`,
+  );
+  writeFileSync(wranglerPath, updated);
+  log("CREATE", `KV namespace created (${newId}) and wrangler.jsonc updated`);
+  return newId;
+}
+
 // ── Step 4: Generate .dev.vars ───────────────────────────────────────────────
 
 function generateDevVars(vars: Record<string, string>) {
@@ -307,6 +399,7 @@ async function deployWorkers(): Promise<{ telegramUrl?: string }> {
 
   const workers = [
     { name: "scaf-llm-gateway", dir: "workers/llm-gateway" },
+    { name: "scaf-google-connector", dir: "workers/connectors/google" },
     { name: "scaf-agent", dir: "workers/agent" },
     { name: "scaf-telegram-gateway", dir: "workers/telegram-gateway" },
   ];
@@ -435,6 +528,7 @@ async function main() {
 
   const vars = await collectSecrets();
   await ensureKVNamespace();
+  await ensureGoogleKVNamespace();
   generateDevVars(vars);
   const { telegramUrl } = await deployWorkers();
   await pushSecrets(vars);

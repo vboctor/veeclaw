@@ -1,6 +1,7 @@
 export type {
   Message,
   Tool,
+  ToolCall,
   CompletionRequest,
   CompletionResponse,
   LLMGateway,

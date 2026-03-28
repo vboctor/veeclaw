@@ -4,9 +4,6 @@ import { CronExpressionParser } from "cron-parser";
 import type { Env } from "../index.ts";
 import { dispatchScheduleEntry } from "./dispatch.ts";
 
-// 1-minute interval → ±30 second window for matching
-const WINDOW_MS = 30_000;
-
 export async function runHeartbeat(env: Env): Promise<void> {
   const now = Date.now();
 
@@ -20,14 +17,11 @@ export async function runHeartbeat(env: Env): Promise<void> {
     })
   );
 
-  const windowStart = now - WINDOW_MS;
-  const windowEnd = now + WINDOW_MS;
-
+  // Fire any entry whose nextRun is at or before now (catches missed one-shots too)
   const due = entries.filter(
     (e): e is ScheduleEntry =>
       e !== null &&
-      e.nextRun >= windowStart &&
-      e.nextRun <= windowEnd &&
+      e.nextRun <= now &&
       isWithinActiveHours(e, now) &&
       !hasReachedMaxRuns(e)
   );
