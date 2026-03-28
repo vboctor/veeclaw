@@ -4,14 +4,11 @@
   "compatibility_date": "2025-03-27",
   "compatibility_flags": ["nodejs_compat"],
 
-  // Set via `wrangler secret put`:
+  // Set via `wrangler secret put` or `bun run setup`:
   //   TELEGRAM_BOT_TOKEN
   //   TELEGRAM_WEBHOOK_SECRET
   //   AGENT_TOKEN (optional)
-
-  "vars": {
-    "ALLOWED_CHAT_IDS": ""
-  },
+  //   ALLOWED_CHAT_IDS (optional, comma-separated)
 
   // Service binding to Agent worker
   "services": [

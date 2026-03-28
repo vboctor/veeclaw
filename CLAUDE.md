@@ -45,3 +45,5 @@ workers/
 - `bun run deploy:agent` — Deploy Agent worker only
 - `bun run deploy:gateway` — Deploy LLM gateway only
 - `bun run deploy:telegram` — Deploy Telegram gateway only
+- `bun run setup` — Interactive setup: creates KV, deploys workers, pushes secrets, registers webhook
+- `bun run undeploy` — Tear down all workers, KV namespace, and Telegram webhook

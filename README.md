@@ -98,36 +98,45 @@ bun run deploy:telegram    # Deploy Telegram gateway only
 
 **Model aliases:** `haiku`, `sonnet`, `opus`, `gpt4o`, `gpt4o-mini`, `gemini-flash`, `gemini-pro`
 
-## Deploying the Workers
+## Setup
 
-### 1. LLM Gateway (deploy first)
-
-The LLM Gateway is a passthrough to OpenRouter. It holds the API key and is only accessible via service binding from the Agent — no public HTTP access.
+### Quick setup (recommended)
 
 ```bash
-cd workers/llm-gateway
-
-# Set secrets
-wrangler secret put OPENROUTER_API_KEY
-
-# Deploy
-wrangler deploy
+bun install
+cp .env.example .env    # fill in your API keys
+bun run setup
 ```
 
-### 2. Agent Worker
+The setup wizard detects existing state and only performs what's missing:
+
+- Prompts for any secrets not yet in `.env`
+- Creates the KV namespace (or reuses existing)
+- Deploys all three workers
+- Pushes secrets to Cloudflare (only missing ones)
+- Registers the Telegram webhook
+
+Re-run `bun run setup` at any time — it's incremental and safe to repeat. Use `bun run setup --force` to redo everything.
+
+### Teardown
+
+To remove all deployed workers, KV namespaces, and the Telegram webhook:
+
+```bash
+bun run undeploy
+```
+
+Your `.env` is preserved so you can re-run `bun run setup` to redeploy.
+
+### Manual setup
+
+See each worker's `wrangler.jsonc` for required secrets and bindings. Secrets can be set individually with `wrangler secret put`.
+
+## Worker Architecture
+
+### Agent Worker
 
 The Agent is the central worker. It owns memory, system prompt injection, scheduling, and dispatch. It has a cron trigger (every minute) for the heartbeat scheduler.
-
-```bash
-cd workers/agent
-
-# Set secrets
-wrangler secret put TELEGRAM_BOT_TOKEN
-wrangler secret put AGENT_TOKEN          # optional, for authenticating CLI requests
-
-# Deploy
-wrangler deploy
-```
 
 **Routes:**
 
@@ -148,30 +157,11 @@ The Agent automatically manages conversation memory via Cloudflare KV (`AGENT_KV
 
 Memory is injected into the system prompt and updated in the background after each response.
 
-### 3. Telegram Gateway
+### LLM Gateway
 
-```bash
-cd workers/telegram-gateway
+The LLM Gateway is a passthrough to OpenRouter. It holds the API key and is only accessible via service binding from the Agent — no public HTTP access.
 
-# Set secrets
-wrangler secret put TELEGRAM_BOT_TOKEN
-wrangler secret put TELEGRAM_WEBHOOK_SECRET
-wrangler secret put AGENT_TOKEN          # optional, must match Agent's AGENT_TOKEN
-
-# Deploy
-wrangler deploy
-```
-
-Register the webhook with Telegram:
-
-```bash
-curl -X POST "https://api.telegram.org/bot<TOKEN>/setWebhook" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "url": "https://scaf-telegram-gateway.<your-subdomain>.workers.dev",
-    "secret_token": "<TELEGRAM_WEBHOOK_SECRET>"
-  }'
-```
+### Telegram Gateway
 
 **Bot commands:**
 

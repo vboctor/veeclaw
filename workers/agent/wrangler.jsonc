@@ -14,7 +14,7 @@
 
   // Single KV namespace for memory (memory:*) and schedules (schedule:*)
   "kv_namespaces": [
-    { "binding": "AGENT_KV", "id": "c957d678da6e4a53aedd6bc5522a1901" }
+    { "binding": "AGENT_KV", "id": "f56cc23eb6bc40aca294bd1ac5a260f7" }
   ],
 
   // Service binding to LLM gateway
@@ -22,11 +22,8 @@
     { "binding": "LLM_GATEWAY", "service": "scaf-llm-gateway" }
   ],
 
-  // Set via `wrangler secret put`:
-  //   AGENT_TOKEN (optional, for authenticating CLI requests)
+  // Set via `wrangler secret put` or `bun run setup`:
   //   TELEGRAM_BOT_TOKEN
-
-  "vars": {
-    "DEFAULT_CHAT_ID": "8763462299"
-  }
+  //   AGENT_TOKEN (optional, for authenticating CLI requests)
+  //   DEFAULT_CHAT_ID (optional, Telegram chat ID for dispatch)
 }
