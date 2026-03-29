@@ -6,7 +6,7 @@ import type {
 
 export interface AgentEnv {
   AGENT: Fetcher;
-  AGENT_TOKEN?: string;
+  AGENT_TOKEN: string;
 }
 
 export async function complete(
@@ -20,9 +20,7 @@ export async function complete(
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
-  if (env.AGENT_TOKEN) {
-    headers["Authorization"] = `Bearer ${env.AGENT_TOKEN}`;
-  }
+  headers["Authorization"] = `Bearer ${env.AGENT_TOKEN}`;
 
   const res = await env.AGENT.fetch("https://internal/v1/complete", {
     method: "POST",

@@ -15,18 +15,21 @@ function getAgentUrl(): string {
   return url.replace(/\/$/, "");
 }
 
-function getAgentToken(): string | undefined {
-  return getSecret("agent_token");
+function getAgentToken(): string {
+  const token = getSecret("agent_token");
+  if (!token) {
+    throw new Error(
+      "Agent token not configured. Run scaf to set it up."
+    );
+  }
+  return token;
 }
 
 function buildHeaders(): Record<string, string> {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
-  const token = getAgentToken();
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
-  }
+  headers["Authorization"] = `Bearer ${getAgentToken()}`;
   return headers;
 }
 

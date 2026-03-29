@@ -97,8 +97,8 @@ function writeEnvFile(path: string, vars: Record<string, string>) {
 
 // ── Secret/Var definitions ───────────────────────────────────────────────────
 
-const REQUIRED_SECRETS = ["OPENROUTER_API_KEY", "TELEGRAM_BOT_TOKEN", "TELEGRAM_WEBHOOK_SECRET"] as const;
-const OPTIONAL_SECRETS = ["AGENT_TOKEN", "DEFAULT_CHAT_ID", "ALLOWED_CHAT_IDS"] as const;
+const REQUIRED_SECRETS = ["OPENROUTER_API_KEY", "TELEGRAM_BOT_TOKEN", "TELEGRAM_WEBHOOK_SECRET", "AGENT_TOKEN"] as const;
+const OPTIONAL_SECRETS = ["DEFAULT_CHAT_ID", "ALLOWED_CHAT_IDS"] as const;
 const AUTO_GENERATE = ["TELEGRAM_WEBHOOK_SECRET", "AGENT_TOKEN"] as const;
 const GOOGLE_SECRETS = ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_REFRESH_TOKEN"] as const;
 
@@ -112,12 +112,12 @@ const WORKER_SECRETS: Record<string, { required: string[]; optional: string[] }>
     optional: [],
   },
   "scaf-agent": {
-    required: ["TELEGRAM_BOT_TOKEN"],
-    optional: ["AGENT_TOKEN", "DEFAULT_CHAT_ID"],
+    required: ["TELEGRAM_BOT_TOKEN", "AGENT_TOKEN"],
+    optional: ["DEFAULT_CHAT_ID"],
   },
   "scaf-telegram-gateway": {
-    required: ["TELEGRAM_BOT_TOKEN", "TELEGRAM_WEBHOOK_SECRET"],
-    optional: ["AGENT_TOKEN", "ALLOWED_CHAT_IDS"],
+    required: ["TELEGRAM_BOT_TOKEN", "TELEGRAM_WEBHOOK_SECRET", "AGENT_TOKEN"],
+    optional: ["ALLOWED_CHAT_IDS"],
   },
 };
 

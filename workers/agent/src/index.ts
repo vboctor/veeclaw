@@ -29,7 +29,7 @@ import { executeToolCalls } from "./tools/execute.ts";
 import SYSTEM_PROMPT from "./prompts/system.md";
 
 export interface Env {
-  AGENT_TOKEN?: string;
+  AGENT_TOKEN: string;
   AGENT_KV: KVNamespace;
   LLM_GATEWAY: Fetcher;
   GOOGLE_CONNECTOR: Fetcher;
@@ -52,7 +52,6 @@ function unauthorized(): Response {
 }
 
 function authenticate(request: Request, env: Env): boolean {
-  if (!env.AGENT_TOKEN) return true;
   const auth = request.headers.get("Authorization");
   return auth === `Bearer ${env.AGENT_TOKEN}`;
 }
