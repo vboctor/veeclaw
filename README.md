@@ -2,19 +2,23 @@
 
 A modular, provider-agnostic LLM framework with a terminal chat interface, a Cloudflare Worker agent with 3-tier memory and scheduling, and a Telegram bot — all powered by Bun and TypeScript.
 
-```text
-                      CLI TUI (Ink/React)
-                            │
-Telegram Bot ───┐           │
-                ▼           ▼
-          Telegram Gateway → Agent → LLM Gateway → OpenRouter
-                              ↕
-                        Google Connector → Gmail, Calendar, Drive
-                             (3-tier memory via KV)
-                             (scheduling via KV + cron)
-                             (tool calling with execution loop)
-                             (dispatch: Telegram, HTTP)
-```
+## Architecture
+
+![SCAF Architecture](docs/architecture.png)
+
+SCAF runs entirely on Cloudflare's serverless platform (free or $5/mo plan). The architecture separates concerns across dedicated workers connected via service bindings:
+
+- **Channel Workers** (e.g. Telegram) handle user-facing messaging and relay conversations to the Agent. Each channel is a thin relay with no LLM logic.
+- **Agent Worker** is the central hub — it owns memory, system prompts, scheduling, tool calling, and dispatch. A cron trigger (1-minute resolution) drives the heartbeat scheduler.
+- **LLM Gateway** is an internal-only passthrough to OpenRouter, providing access to Claude, OpenAI, and open models with web search. It holds the API key in isolation and forwards tool definitions/results transparently — the actual tool execution loop lives in the Agent.
+- **Connector Workers** (e.g. Google) own OAuth2 tokens, API calls, and secrets for external services. The Agent invokes them as tools during LLM conversations.
+- **Key-Value storage** backs agent memory (3-tier: working, summary, facts) and schedules, optimized for minimal reads per request.
+- **Cache/State** (KV, R2, D1) is optional — connectors that need to persist or cache data (e.g. OAuth token caching) can bind their own storage.
+- **Containers** (Cloudflare Containers, Google Cloud Run) are optional — an escape hatch for workloads that don't fit the Workers model. Most users won't need them.
+
+Dotted borders in the diagram indicate optional components that may not be present in every deployment.
+
+The design is serverless, sandboxed, and token-efficient. The cron heartbeat is a pure KV check — it only invokes the LLM (and consumes tokens) when a scheduled task actually fires. There is no periodic LLM-driven heartbeat. Users who want regular LLM-powered check-ins can create a recurring schedule (e.g. every 30 minutes) to achieve the same effect on their own terms.
 
 ## Features
 
