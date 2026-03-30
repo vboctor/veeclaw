@@ -218,7 +218,7 @@ async function main() {
   if (!tokens.refresh_token) {
     server.stop();
     log("ERROR", "No refresh token received. This can happen if you previously authorized this app.");
-    log("INFO", "Go to https://myaccount.google.com/connections and remove SCAF, then try again.");
+    log("INFO", "Go to https://myaccount.google.com/connections and remove VeeClaw, then try again.");
     process.exit(1);
   }
 

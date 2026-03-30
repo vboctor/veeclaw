@@ -1,4 +1,4 @@
-import type { ScheduleEntry, PromptScheduleEntry } from "@scaf/shared";
+import type { ScheduleEntry, PromptScheduleEntry } from "@veeclaw/shared";
 import { CronExpressionParser } from "cron-parser";
 
 const SCHEDULES_KEY = "schedules";

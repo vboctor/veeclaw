@@ -1,4 +1,4 @@
-import type { Message } from "@scaf/shared";
+import type { Message } from "@veeclaw/shared";
 
 const MAX_MESSAGES_PER_CHAT = 20;
 

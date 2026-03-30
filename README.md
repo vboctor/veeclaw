@@ -1,12 +1,14 @@
-# SCAF — Serverless Cloud Agent Framework
+# VeeClaw — Personal AI Agent on Cloudflare Workers
+
+[![X (Twitter)](https://img.shields.io/badge/Follow-@VeeClaw-black?logo=x)](https://x.com/VeeClaw)
 
 A modular, provider-agnostic LLM framework with a terminal chat interface, a Cloudflare Worker agent with 3-tier memory and scheduling, and a Telegram bot — all powered by Bun and TypeScript.
 
 ## Architecture
 
-![SCAF Architecture](docs/architecture.png)
+![VeeClaw Architecture](docs/architecture.png)
 
-SCAF runs entirely on Cloudflare's serverless platform (free or $5/mo plan). The architecture separates concerns across dedicated workers connected via service bindings:
+VeeClaw runs entirely on Cloudflare's serverless platform (free or $5/mo plan). The architecture separates concerns across dedicated workers connected via service bindings:
 
 - **Channel Workers** (e.g. Telegram) handle user-facing messaging and relay conversations to the Agent. Each channel is a thin relay with no LLM logic.
 - **Agent Worker** is the central hub — it owns memory, system prompts, scheduling, tool calling, and dispatch. A cron trigger (1-minute resolution) drives the heartbeat scheduler.
@@ -30,7 +32,7 @@ The design is serverless, sandboxed, and token-efficient. The cron heartbeat is 
 - **Telegram Gateway Worker** — Telegram bot that relays messages through the Agent
 - **Natural-language scheduling** — Create, list, update, and delete schedules through conversation
 - **Provider-agnostic** — OpenRouter gives access to Claude, GPT-4o, Gemini, and more
-- **Shared types** — Common interfaces in `@scaf/shared` used across all components
+- **Shared types** — Common interfaces in `@veeclaw/shared` used across all components
 
 ## Project Structure
 
@@ -39,9 +41,9 @@ src/                          CLI TUI
   app.tsx                     Root chat component
   components/                 Ink UI components
   llm/                        LLM client (agent or direct)
-  secrets/                    ~/.scaf/secrets.json management
+  secrets/                    ~/.veeclaw/secrets.json management
 
-packages/shared/              Shared types (@scaf/shared)
+packages/shared/              Shared types (@veeclaw/shared)
 
 workers/
   agent/                      Cloudflare Worker — Agent (memory, prompts, scheduling, dispatch)
@@ -77,7 +79,7 @@ On first launch, the setup wizard prompts you to choose a connection mode:
 1. **Agent Worker** — enter the URL and token of your deployed Agent worker
 2. **Direct OpenRouter** — enter your OpenRouter API key directly
 
-Secrets are stored at `~/.scaf/secrets.json` (file permissions 0600).
+Secrets are stored at `~/.veeclaw/secrets.json` (file permissions 0600).
 
 ## Scripts
 
@@ -292,13 +294,13 @@ When a recurring entry reaches its `maxRuns` limit, it is automatically deleted.
 
 The Agent heartbeat runs every minute. Scheduled events fire on the first heartbeat tick after their `nextRun` time, so they may be up to ~60 seconds late but are never missed.
 
-## How SCAF Compares
+## How VeeClaw Compares
 
-The personal AI agent space took off in late 2025 with the rise of OpenClaw and its alternatives. SCAF takes a fundamentally different approach: **serverless-native, zero-maintenance infrastructure** instead of self-hosted daemons or containers.
+The personal AI agent space took off in late 2025 with the rise of OpenClaw and its alternatives. VeeClaw takes a fundamentally different approach: **serverless-native, zero-maintenance infrastructure** instead of self-hosted daemons or containers.
 
 ### At a Glance
 
-| Dimension | OpenClaw | NanoClaw | ZeroClaw | **SCAF** |
+| Dimension | OpenClaw | NanoClaw | ZeroClaw | **VeeClaw** |
 |---|---|---|---|---|
 | **Language** | TypeScript / Node.js | Node.js + Claude Agent SDK | Rust | **TypeScript / Bun** |
 | **Runtime** | Node.js process | Docker containers | Single binary daemon | **Cloudflare Workers (serverless)** |
@@ -315,42 +317,42 @@ The personal AI agent space took off in late 2025 with the rise of OpenClaw and 
 | **Codebase** | 100K+ lines | ~3,900 lines | Unknown | **~3,000 lines** |
 | **Security model** | Permission-based | Container isolation | OS-level + allowlists | **CF Worker isolation + service bindings** |
 
-### Why SCAF
+### Why VeeClaw
 
-**Zero maintenance.** OpenClaw users report 8–20 hours of initial setup and 2–4 hours of monthly maintenance — daemon crashes, Node.js version conflicts, plugin breakage, update regressions. NanoClaw requires Docker expertise. ZeroClaw runs as a daemon with 261 `.unwrap()` calls that can panic and crash the runtime. SCAF deploys with `bun run setup` and runs on Cloudflare's managed infrastructure. There is no daemon to crash, no server to SSH into at 2am, no Docker to configure.
+**Zero maintenance.** OpenClaw users report 8–20 hours of initial setup and 2–4 hours of monthly maintenance — daemon crashes, Node.js version conflicts, plugin breakage, update regressions. NanoClaw requires Docker expertise. ZeroClaw runs as a daemon with 261 `.unwrap()` calls that can panic and crash the runtime. VeeClaw deploys with `bun run setup` and runs on Cloudflare's managed infrastructure. There is no daemon to crash, no server to SSH into at 2am, no Docker to configure.
 
-**No idle cost.** Every alternative requires an always-on process. SCAF Workers spin up on request and die after execution. The cron heartbeat is a KV read — it only invokes the LLM when a scheduled task actually fires.
+**No idle cost.** Every alternative requires an always-on process. VeeClaw Workers spin up on request and die after execution. The cron heartbeat is a KV read — it only invokes the LLM when a scheduled task actually fires.
 
 **Isolated by default.** API keys, OAuth tokens, and service credentials never share a runtime. The LLM Gateway holds the OpenRouter key. The Google Connector holds OAuth tokens. The Agent orchestrates via service bindings — internal RPC with no network hops and no public HTTP surface.
 
-**Scheduling that works.** SCAF's scheduling is purpose-built: cron expressions, one-shot timers, natural language creation, active hours, run limits, and run tracking — all backed by platform-level cron triggers with 1-minute resolution. No timing drift from in-process timers.
+**Scheduling that works.** VeeClaw's scheduling is purpose-built: cron expressions, one-shot timers, natural language creation, active hours, run limits, and run tracking — all backed by platform-level cron triggers with 1-minute resolution. No timing drift from in-process timers.
 
 ### vs. OpenClaw
 
-OpenClaw has the broadest feature set (20+ messaging channels, voice, skills marketplace) and the largest community (247K stars). If you need WhatsApp, Slack, Discord, and iMessage support today, OpenClaw is the pragmatic choice. But the operational burden is significant: major updates regularly break working configurations (v2026.3.22 broke Dashboard UI and WhatsApp with 12 breaking changes), plugins cause gateway unresponsiveness, and Reddit threads describe it as "not even remotely close to production use." SCAF trades channel breadth for reliability and zero ops.
+OpenClaw has the broadest feature set (20+ messaging channels, voice, skills marketplace) and the largest community (247K stars). If you need WhatsApp, Slack, Discord, and iMessage support today, OpenClaw is the pragmatic choice. But the operational burden is significant: major updates regularly break working configurations (v2026.3.22 broke Dashboard UI and WhatsApp with 12 breaking changes), plugins cause gateway unresponsiveness, and Reddit threads describe it as "not even remotely close to production use." VeeClaw trades channel breadth for reliability and zero ops.
 
 ### vs. NanoClaw
 
-NanoClaw's container isolation model is excellent for security — every agent session gets its own Linux container with isolated filesystem and process space. It also supports agent swarms (multiple Claude instances collaborating in parallel). However, it's locked to Claude as the LLM provider, requires Docker infrastructure, and still needs a running server. SCAF is provider-agnostic via OpenRouter and requires no server or container runtime at all.
+NanoClaw's container isolation model is excellent for security — every agent session gets its own Linux container with isolated filesystem and process space. It also supports agent swarms (multiple Claude instances collaborating in parallel). However, it's locked to Claude as the LLM provider, requires Docker infrastructure, and still needs a running server. VeeClaw is provider-agnostic via OpenRouter and requires no server or container runtime at all.
 
 ### vs. ZeroClaw
 
-ZeroClaw's Rust implementation is impressively lightweight (~8.8 MB binary, <5 MB RAM, <10 ms cold start) and targets edge/embedded hardware. Its AIEOS spec for portable agent personas is a novel idea. However, it runs as a system daemon with crash risks from unhandled errors, and its scheduling capabilities are limited. SCAF can't match ZeroClaw's raw performance on constrained hardware, but it eliminates hardware requirements entirely — there is nothing to run.
+ZeroClaw's Rust implementation is impressively lightweight (~8.8 MB binary, <5 MB RAM, <10 ms cold start) and targets edge/embedded hardware. Its AIEOS spec for portable agent personas is a novel idea. However, it runs as a system daemon with crash risks from unhandled errors, and its scheduling capabilities are limited. VeeClaw can't match ZeroClaw's raw performance on constrained hardware, but it eliminates hardware requirements entirely — there is nothing to run.
 
 ### vs. Moltworker
 
-Moltworker is Cloudflare's official serverless OpenClaw port — the closest architectural sibling to SCAF. However, it's explicitly "experimental" and "may break without notice." It's a port of a monolithic codebase onto Workers, not a native serverless design. SCAF was built for Workers from the ground up, with service bindings, KV-backed memory, and cron-triggered scheduling as first-class primitives.
+Moltworker is Cloudflare's official serverless OpenClaw port — the closest architectural sibling to VeeClaw. However, it's explicitly "experimental" and "may break without notice." It's a port of a monolithic codebase onto Workers, not a native serverless design. VeeClaw was built for Workers from the ground up, with service bindings, KV-backed memory, and cron-triggered scheduling as first-class primitives.
 
 ### Tradeoffs
 
-SCAF is not the right choice for every use case:
+VeeClaw is not the right choice for every use case:
 
-- **Channel breadth**: OpenClaw supports 20+ messaging platforms. SCAF currently supports Telegram and CLI.
+- **Channel breadth**: OpenClaw supports 20+ messaging platforms. VeeClaw currently supports Telegram and CLI.
 - **Worker limits**: Cloudflare Workers have CPU time limits (10–30 ms on free plan, 30 s on paid), memory caps, and request size constraints. Complex multi-tool chains may hit these limits.
-- **Vendor coupling**: SCAF runs on Cloudflare. Moving to another platform would require rearchitecting the worker and service binding model.
-- **Community**: OpenClaw has 247K stars and a large ecosystem. SCAF is a solo project.
-- **Voice**: OpenClaw has voice wake and talk modes. SCAF has no voice support.
-- **Agent swarms**: NanoClaw can run multiple Claude instances collaborating in parallel. SCAF runs a single agent.
+- **Vendor coupling**: VeeClaw runs on Cloudflare. Moving to another platform would require rearchitecting the worker and service binding model.
+- **Community**: OpenClaw has 247K stars and a large ecosystem. VeeClaw is a solo project.
+- **Voice**: OpenClaw has voice wake and talk modes. VeeClaw has no voice support.
+- **Agent swarms**: NanoClaw can run multiple Claude instances collaborating in parallel. VeeClaw runs a single agent.
 
 ## Tech Stack
 

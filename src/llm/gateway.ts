@@ -8,7 +8,7 @@ export type Provider = "agent" | "openrouter";
 export function detectProvider(): Provider {
   if (hasSecret("agent_url")) return "agent";
   if (hasSecret("openrouter_api_key")) return "openrouter";
-  throw new Error("No LLM provider configured. Run scaf to set it up.");
+  throw new Error("No LLM provider configured. Run veeclaw to set it up.");
 }
 
 export function createGateway(provider?: Provider): LLMGateway {

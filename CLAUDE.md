@@ -1,4 +1,4 @@
-# SCAF Development Guide
+# VeeClaw Development Guide
 
 Only commit, push, or deploy when explicitly asked by the user.
 
@@ -12,12 +12,12 @@ Use Bun instead of Node.js, npm, pnpm, or vite.
 
 ## Project
 
-SCAF (Serverless Cloud Agent Framework) — CLI & LLM Gateway.
+VeeClaw — Personal AI Agent on Cloudflare Workers.
 
 - Runtime: Bun + TypeScript
 - TUI: Ink (React for terminal)
 - LLM Gateway: Provider-agnostic, starting with OpenRouter
-- Secrets stored at `~/.scaf/secrets.json`
+- Secrets stored at `~/.veeclaw/secrets.json`
 
 ## Structure
 
@@ -27,8 +27,8 @@ src/                          — CLI TUI
   app.tsx                     — Root Ink component (chat layout)
   components/                 — Ink UI components
   llm/                        — LLM Gateway (types, gateway factory, providers)
-  secrets/                    — Secrets management (~/.scaf/secrets.json)
-packages/shared/              — Shared types (@scaf/shared)
+  secrets/                    — Secrets management (~/.veeclaw/secrets.json)
+packages/shared/              — Shared types (@veeclaw/shared)
 workers/
   agent/                      — Cloudflare Worker — Agent (memory, prompts, scheduling, dispatch)
   llm-gateway/                — Cloudflare Worker — LLM passthrough to OpenRouter (internal only)

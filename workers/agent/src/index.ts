@@ -3,7 +3,7 @@ import type {
   CompletionResponse,
   Message,
   ScheduleEntry,
-} from "@scaf/shared";
+} from "@veeclaw/shared";
 import { loadMemory, loadMemoryData } from "./memory/load.ts";
 import { injectMemory } from "./memory/load.ts";
 import { saveMemoryData } from "./memory/store.ts";

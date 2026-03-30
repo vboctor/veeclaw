@@ -9,7 +9,7 @@ function getAgentUrl(): string {
   const url = getSecret("agent_url");
   if (!url) {
     throw new Error(
-      "Agent URL not configured. Run scaf to set it up."
+      "Agent URL not configured. Run veeclaw to set it up."
     );
   }
   return url.replace(/\/$/, "");
@@ -19,7 +19,7 @@ function getAgentToken(): string {
   const token = getSecret("agent_token");
   if (!token) {
     throw new Error(
-      "Agent token not configured. Run scaf to set it up."
+      "Agent token not configured. Run veeclaw to set it up."
     );
   }
   return token;

@@ -7,7 +7,7 @@ import { createGateway } from "./llm/gateway.ts";
 import { hasSecret } from "./secrets/secrets.ts";
 import type { Message } from "./llm/types.ts";
 
-const SYSTEM_PROMPT = `You are SCAF, a helpful AI assistant. Be concise and direct.`;
+const SYSTEM_PROMPT = `You are VeeClaw, a helpful AI assistant. Be concise and direct.`;
 
 const MODEL_ALIASES: Record<string, string> = {
   "haiku": "anthropic/claude-haiku-4.5",
@@ -126,7 +126,7 @@ export function App() {
     <Box flexDirection="column" height="100%">
       <Box borderStyle="single" borderColor="gray" paddingX={1} justifyContent="space-between">
         <Text bold color="green">
-          SCAF
+          VeeClaw
         </Text>
         <Text color="gray">
           {displayModel(model)} · /model · /clear · /quit

@@ -1,4 +1,4 @@
-import type { ScheduleCommand } from "@scaf/shared";
+import type { ScheduleCommand } from "@veeclaw/shared";
 import {
   addSchedule,
   updateSchedule,

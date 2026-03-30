@@ -1,5 +1,5 @@
 {
-  "name": "@scaf/telegram-gateway",
+  "name": "@veeclaw/telegram-gateway",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -10,7 +10,7 @@
     "types": "wrangler types"
   },
   "dependencies": {
-    "@scaf/shared": "workspace:*",
+    "@veeclaw/shared": "workspace:*",
     "grammy": "^1.35.0"
   },
   "devDependencies": {

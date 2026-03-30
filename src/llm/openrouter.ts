@@ -22,7 +22,7 @@ function getApiKey(): string {
   const key = getSecret("openrouter_api_key");
   if (!key) {
     throw new Error(
-      "OpenRouter API key not configured. Run scaf to set it up."
+      "OpenRouter API key not configured. Run veeclaw to set it up."
     );
   }
   return key;
@@ -39,8 +39,8 @@ export function createOpenRouterGateway(): LLMGateway {
         headers: {
           Authorization: `Bearer ${apiKey}`,
           "Content-Type": "application/json",
-          "HTTP-Referer": "https://github.com/vboctor/scaf",
-          "X-Title": "SCAF",
+          "HTTP-Referer": "https://github.com/vboctor/veeclaw",
+          "X-Title": "VeeClaw",
         },
         body: JSON.stringify({
           model,
@@ -82,8 +82,8 @@ export function createOpenRouterGateway(): LLMGateway {
         headers: {
           Authorization: `Bearer ${apiKey}`,
           "Content-Type": "application/json",
-          "HTTP-Referer": "https://github.com/vboctor/scaf",
-          "X-Title": "SCAF",
+          "HTTP-Referer": "https://github.com/vboctor/veeclaw",
+          "X-Title": "VeeClaw",
         },
         body: JSON.stringify({
           model,

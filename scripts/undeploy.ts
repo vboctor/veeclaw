@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * SCAF Undeploy — tears down all Cloudflare resources and local config.
+ * VeeClaw Undeploy — tears down all Cloudflare resources and local config.
  *
  * Deletes: Telegram webhook, all 3 workers, KV namespace, local .dev.vars files.
  * Does NOT delete .env (so you can re-run setup easily).
@@ -66,7 +66,7 @@ function parseEnvFile(path: string): Record<string, string> {
 async function main() {
   console.log("\x1b[1m\x1b[31m");
   console.log("  ╔═══════════════════════════════════╗");
-  console.log("  ║       SCAF Undeploy / Teardown     ║");
+  console.log("  ║     VeeClaw Undeploy / Teardown     ║");
   console.log("  ╚═══════════════════════════════════╝");
   console.log("\x1b[0m");
 
@@ -108,10 +108,10 @@ async function main() {
   header("Workers");
 
   const workers = [
-    "scaf-telegram-gateway",
-    "scaf-agent",
-    "scaf-google-connector",
-    "scaf-llm-gateway",
+    "veeclaw-telegram-gateway",
+    "veeclaw-agent",
+    "veeclaw-google-connector",
+    "veeclaw-llm-gateway",
   ];
 
   for (const name of workers) {

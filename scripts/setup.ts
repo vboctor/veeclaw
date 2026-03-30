@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 /**
- * SCAF Setup Wizard — incremental, idempotent setup for Cloudflare Workers.
+ * VeeClaw Setup Wizard — incremental, idempotent setup for Cloudflare Workers.
  *
  * Usage:
  *   bun run setup            # interactive, skips what's already done
@@ -103,19 +103,19 @@ const AUTO_GENERATE = ["TELEGRAM_WEBHOOK_SECRET", "AGENT_TOKEN"] as const;
 const GOOGLE_SECRETS = ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_REFRESH_TOKEN"] as const;
 
 const WORKER_SECRETS: Record<string, { required: string[]; optional: string[] }> = {
-  "scaf-llm-gateway": {
+  "veeclaw-llm-gateway": {
     required: ["OPENROUTER_API_KEY"],
     optional: [],
   },
-  "scaf-google-connector": {
+  "veeclaw-google-connector": {
     required: ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_REFRESH_TOKEN"],
     optional: [],
   },
-  "scaf-agent": {
+  "veeclaw-agent": {
     required: ["TELEGRAM_BOT_TOKEN", "AGENT_TOKEN"],
     optional: ["DEFAULT_CHAT_ID"],
   },
-  "scaf-telegram-gateway": {
+  "veeclaw-telegram-gateway": {
     required: ["TELEGRAM_BOT_TOKEN", "TELEGRAM_WEBHOOK_SECRET", "AGENT_TOKEN"],
     optional: ["ALLOWED_CHAT_IDS"],
   },
@@ -398,10 +398,10 @@ async function deployWorkers(): Promise<{ telegramUrl?: string }> {
   header("Deploy Workers");
 
   const workers = [
-    { name: "scaf-llm-gateway", dir: "workers/llm-gateway" },
-    { name: "scaf-google-connector", dir: "workers/connectors/google" },
-    { name: "scaf-agent", dir: "workers/agent" },
-    { name: "scaf-telegram-gateway", dir: "workers/telegram-gateway" },
+    { name: "veeclaw-llm-gateway", dir: "workers/llm-gateway" },
+    { name: "veeclaw-google-connector", dir: "workers/connectors/google" },
+    { name: "veeclaw-agent", dir: "workers/agent" },
+    { name: "veeclaw-telegram-gateway", dir: "workers/telegram-gateway" },
   ];
 
   let telegramUrl: string | undefined;
@@ -412,7 +412,7 @@ async function deployWorkers(): Promise<{ telegramUrl?: string }> {
     if (result.ok) {
       const urlMatch = result.stdout.match(/https:\/\/[^\s]+\.workers\.dev/);
       log("OK", `${name} deployed${urlMatch ? ` → ${urlMatch[0]}` : ""}`);
-      if (name === "scaf-telegram-gateway" && urlMatch) {
+      if (name === "veeclaw-telegram-gateway" && urlMatch) {
         telegramUrl = urlMatch[0];
       }
     } else {
@@ -481,7 +481,7 @@ async function registerWebhook(vars: Record<string, string>, telegramUrl?: strin
       telegramUrl = info.result.url;
       log("INFO", `Using existing webhook URL: ${telegramUrl}`);
     } else {
-      telegramUrl = promptUser("Telegram gateway worker URL (e.g. https://scaf-telegram-gateway.yourname.workers.dev)");
+      telegramUrl = promptUser("Telegram gateway worker URL (e.g. https://veeclaw-telegram-gateway.yourname.workers.dev)");
       if (!telegramUrl) {
         log("WARN", "No URL provided — skipping webhook registration");
         return;
@@ -514,7 +514,7 @@ async function registerWebhook(vars: Record<string, string>, telegramUrl?: strin
 async function main() {
   console.log("\x1b[1m\x1b[36m");
   console.log("  ╔═══════════════════════════════════╗");
-  console.log("  ║        SCAF Setup Wizard          ║");
+  console.log("  ║        VeeClaw Setup Wizard          ║");
   console.log("  ╚═══════════════════════════════════╝");
   console.log("\x1b[0m");
 
@@ -535,7 +535,7 @@ async function main() {
   await registerWebhook(vars, telegramUrl);
 
   header("Done");
-  console.log("  Your SCAF environment is ready!");
+  console.log("  Your VeeClaw environment is ready!");
   console.log("  - Local dev:  bun run dev:agent / dev:gateway / dev:telegram");
   console.log("  - CLI:        bun run start");
   console.log("  - Re-run this wizard any time: bun run setup");

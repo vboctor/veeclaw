@@ -2,7 +2,7 @@ import type {
   CompletionRequest,
   CompletionResponse,
   Message,
-} from "@scaf/shared";
+} from "@veeclaw/shared";
 
 export interface AgentEnv {
   AGENT: Fetcher;

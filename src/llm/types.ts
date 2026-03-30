@@ -4,4 +4,4 @@ export type {
   CompletionRequest,
   CompletionResponse,
   LLMGateway,
-} from "@scaf/shared";
+} from "@veeclaw/shared";

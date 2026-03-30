@@ -1,4 +1,4 @@
-import type { ToolCall, Message } from "@scaf/shared";
+import type { ToolCall, Message } from "@veeclaw/shared";
 import { GOOGLE_TOOL_ROUTES } from "./google.ts";
 
 /**

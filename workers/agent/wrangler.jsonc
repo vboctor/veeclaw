@@ -1,5 +1,5 @@
 {
-  "name": "scaf-agent",
+  "name": "veeclaw-agent",
   "main": "src/index.ts",
   "compatibility_date": "2025-03-27",
   "compatibility_flags": ["nodejs_compat"],
@@ -19,8 +19,8 @@
 
   // Service bindings
   "services": [
-    { "binding": "LLM_GATEWAY", "service": "scaf-llm-gateway" },
-    { "binding": "GOOGLE_CONNECTOR", "service": "scaf-google-connector" }
+    { "binding": "LLM_GATEWAY", "service": "veeclaw-llm-gateway" },
+    { "binding": "GOOGLE_CONNECTOR", "service": "veeclaw-google-connector" }
   ],
 
   // Set via `wrangler secret put` or `bun run setup`:

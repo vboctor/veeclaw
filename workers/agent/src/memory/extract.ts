@@ -1,4 +1,4 @@
-import type { CompletionRequest, CompletionResponse } from "@scaf/shared";
+import type { CompletionRequest, CompletionResponse } from "@veeclaw/shared";
 import { MEMORY_MODEL, DEFAULT_MEMORY_CONFIG } from "./types.ts";
 import type { MemoryData } from "./types.ts";
 import {

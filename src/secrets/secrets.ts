@@ -2,7 +2,7 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { mkdirSync, existsSync, readFileSync, writeFileSync } from "node:fs";
 
-const SECRETS_DIR = join(homedir(), ".scaf");
+const SECRETS_DIR = join(homedir(), ".veeclaw");
 const SECRETS_FILE = join(SECRETS_DIR, "secrets.json");
 
 function readSecrets(): Record<string, string> {

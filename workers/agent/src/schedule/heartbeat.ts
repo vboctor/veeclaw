@@ -1,4 +1,4 @@
-import type { ScheduleEntry } from "@scaf/shared";
+import type { ScheduleEntry } from "@veeclaw/shared";
 import { CronExpressionParser } from "cron-parser";
 import type { Env } from "../index.ts";
 import { dispatchScheduleEntry } from "./dispatch.ts";

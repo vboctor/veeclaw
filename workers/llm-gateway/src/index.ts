@@ -3,7 +3,7 @@ import type {
   CompletionResponse,
   Message,
   ToolCall,
-} from "@scaf/shared";
+} from "@veeclaw/shared";
 
 interface Env {
   OPENROUTER_API_KEY: string;
@@ -48,8 +48,8 @@ async function handleComplete(
     headers: {
       Authorization: `Bearer ${env.OPENROUTER_API_KEY}`,
       "Content-Type": "application/json",
-      "HTTP-Referer": "https://github.com/vboctor/scaf",
-      "X-Title": "SCAF",
+      "HTTP-Referer": "https://github.com/vboctor/veeclaw",
+      "X-Title": "VeeClaw",
     },
     body: JSON.stringify(payload),
   });
@@ -105,8 +105,8 @@ async function handleStream(
     headers: {
       Authorization: `Bearer ${env.OPENROUTER_API_KEY}`,
       "Content-Type": "application/json",
-      "HTTP-Referer": "https://github.com/vboctor/scaf",
-      "X-Title": "SCAF",
+      "HTTP-Referer": "https://github.com/vboctor/veeclaw",
+      "X-Title": "VeeClaw",
     },
     body: JSON.stringify(payload),
   });

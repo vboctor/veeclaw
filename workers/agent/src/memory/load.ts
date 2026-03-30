@@ -1,4 +1,4 @@
-import type { CompletionRequest } from "@scaf/shared";
+import type { CompletionRequest } from "@veeclaw/shared";
 import type { LoadedMemory, MemoryData } from "./types.ts";
 import { loadMemoryData } from "./store.ts";
 

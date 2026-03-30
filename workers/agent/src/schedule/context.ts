@@ -1,4 +1,4 @@
-import type { ScheduleEntry } from "@scaf/shared";
+import type { ScheduleEntry } from "@veeclaw/shared";
 import { listSchedules } from "./store.ts";
 
 const SCHEDULE_KEYWORDS = [

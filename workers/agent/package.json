@@ -1,5 +1,5 @@
 {
-  "name": "@scaf/agent",
+  "name": "@veeclaw/agent",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -10,7 +10,7 @@
     "types": "wrangler types"
   },
   "dependencies": {
-    "@scaf/shared": "workspace:*",
+    "@veeclaw/shared": "workspace:*",
     "cron-parser": "^5.0.6"
   },
   "devDependencies": {

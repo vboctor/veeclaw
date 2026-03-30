@@ -1,7 +1,7 @@
 {
-  "name": "scaf",
+  "name": "veeclaw",
   "version": "0.1.0",
-  "description": "Serverless Cloud Agent Framework — CLI & LLM Gateway",
+  "description": "VeeClaw — Personal AI Agent on Cloudflare Workers",
   "module": "src/index.tsx",
   "type": "module",
   "private": true,
@@ -31,7 +31,7 @@
     "typescript": "^5"
   },
   "dependencies": {
-    "@scaf/shared": "workspace:*",
+    "@veeclaw/shared": "workspace:*",
     "ink": "^6.8.0",
     "ink-spinner": "^5.0.0",
     "ink-text-input": "^6.0.0",

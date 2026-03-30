@@ -5,7 +5,7 @@ import type {
   ScheduleEntry,
   PromptScheduleEntry,
   ActionScheduleEntry,
-} from "@scaf/shared";
+} from "@veeclaw/shared";
 import type { Env } from "../index.ts";
 import { loadMemory, loadMemoryData, injectMemory } from "../memory/load.ts";
 import { saveMemoryData } from "../memory/store.ts";

@@ -1,5 +1,5 @@
 {
-  "name": "@scaf/llm-gateway",
+  "name": "@veeclaw/llm-gateway",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -10,7 +10,7 @@
     "types": "wrangler types"
   },
   "dependencies": {
-    "@scaf/shared": "workspace:*"
+    "@veeclaw/shared": "workspace:*"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250312.0",

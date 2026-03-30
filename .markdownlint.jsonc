@@ -10,7 +10,7 @@
   // Allow duplicate headings in different sections (e.g. ## Setup in multiple docs)
   "MD024": { "siblings_only": true },
 
-  // Allow trailing punctuation in headings (e.g. "What is SCAF?")
+  // Allow trailing punctuation in headings (e.g. "What is VeeClaw?")
   "MD026": false,
 
   // Allow multiple top-level headings (some files like CHANGELOG need them)

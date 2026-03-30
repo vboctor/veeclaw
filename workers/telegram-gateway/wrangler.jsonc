@@ -1,5 +1,5 @@
 {
-  "name": "scaf-telegram-gateway",
+  "name": "veeclaw-telegram-gateway",
   "main": "src/index.ts",
   "compatibility_date": "2025-03-27",
   "compatibility_flags": ["nodejs_compat"],
@@ -12,6 +12,6 @@
 
   // Service binding to Agent worker
   "services": [
-    { "binding": "AGENT", "service": "scaf-agent" }
+    { "binding": "AGENT", "service": "veeclaw-agent" }
   ]
 }

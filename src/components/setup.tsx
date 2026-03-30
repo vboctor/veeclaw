@@ -52,7 +52,7 @@ export function Setup({ onComplete }: SetupProps) {
   return (
     <Box flexDirection="column" padding={1}>
       <Text bold color="yellow">
-        SCAF Setup
+        VeeClaw Setup
       </Text>
       <Text> </Text>
 
@@ -79,7 +79,7 @@ export function Setup({ onComplete }: SetupProps) {
 
       {mode === "agent" && (
         <>
-          <Text>Enter your SCAF Agent Worker URL:</Text>
+          <Text>Enter your VeeClaw Agent Worker URL:</Text>
           <Text> </Text>
           <Box>
             <Text bold color="cyan">
@@ -89,7 +89,7 @@ export function Setup({ onComplete }: SetupProps) {
               value={value}
               onChange={setValue}
               onSubmit={handleAgentUrl}
-              placeholder="https://scaf-agent.your-account.workers.dev"
+              placeholder="https://veeclaw-agent.your-account.workers.dev"
             />
           </Box>
         </>

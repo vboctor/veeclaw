@@ -1,4 +1,4 @@
-import type { Message } from "@scaf/shared";
+import type { Message } from "@veeclaw/shared";
 
 export interface MemoryConfig {
   workingWindow: number;

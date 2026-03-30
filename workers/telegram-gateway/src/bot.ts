@@ -1,5 +1,5 @@
 import { Bot, type Context } from "grammy";
-import type { Message } from "@scaf/shared";
+import type { Message } from "@veeclaw/shared";
 import { complete, type AgentEnv } from "./agent-client.ts";
 import { getHistory, appendToHistory, clearHistory } from "./history.ts";
 import { chunkText } from "./chunks.ts";
@@ -23,7 +23,7 @@ export function createBot(env: BotEnv): Bot {
 
   bot.command("start", (ctx) =>
     ctx.reply(
-      "Welcome to SCAF! Send me a message and I'll respond using the LLM gateway.\n\n" +
+      "Welcome to VeeClaw! Send me a message and I'll respond using the LLM gateway.\n\n" +
         "Commands:\n" +
         "/help — show this message\n" +
         "/model <name> — switch model\n" +

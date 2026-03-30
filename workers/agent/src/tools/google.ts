@@ -1,4 +1,4 @@
-import type { Tool } from "@scaf/shared";
+import type { Tool } from "@veeclaw/shared";
 
 /** Tool route mapping: tool name → Google Connector HTTP path */
 export const GOOGLE_TOOL_ROUTES: Record<string, string> = {
