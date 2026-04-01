@@ -38,6 +38,17 @@
         "wrangler": "^4",
       },
     },
+    "workers/connectors/github": {
+      "name": "@veeclaw/github-connector",
+      "version": "0.1.0",
+      "dependencies": {
+        "@veeclaw/shared": "workspace:*",
+      },
+      "devDependencies": {
+        "@cloudflare/workers-types": "^4.20250312.0",
+        "wrangler": "^4",
+      },
+    },
     "workers/connectors/google": {
       "name": "@veeclaw/google-connector",
       "version": "0.1.0",
@@ -225,6 +236,8 @@
     "@types/react": ["@types/react@19.2.14", "", { "dependencies": { "csstype": "^3.2.2" } }, "sha512-ilcTH/UniCkMdtexkoCN0bI7pMcJDvmQFPvuPvmEaYA/NSfFTAgdUSLAoVjaRJm7+6PvcM+q1zYOwS4wTYMF9w=="],
 
     "@veeclaw/agent": ["@veeclaw/agent@workspace:workers/agent"],
+
+    "@veeclaw/github-connector": ["@veeclaw/github-connector@workspace:workers/connectors/github"],
 
     "@veeclaw/google-connector": ["@veeclaw/google-connector@workspace:workers/connectors/google"],
 

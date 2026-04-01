@@ -18,8 +18,11 @@
     "deploy:telegram": "cd workers/telegram-gateway && bunx wrangler deploy",
     "dev:google": "cd workers/connectors/google && bunx wrangler dev",
     "deploy:google": "cd workers/connectors/google && bunx wrangler deploy",
+    "dev:github": "cd workers/connectors/github && bunx wrangler dev",
+    "deploy:github": "cd workers/connectors/github && bunx wrangler deploy",
     "google-auth": "bun run scripts/google-auth.ts",
-    "deploy": "bun run deploy:gateway && bun run deploy:google && bun run deploy:agent && bun run deploy:telegram",
+    "github-auth": "bun run scripts/github-auth.ts",
+    "deploy": "bun run deploy:gateway && bun run deploy:google && bun run deploy:github && bun run deploy:agent && bun run deploy:telegram",
     "setup": "bun run scripts/setup.ts",
     "undeploy": "bun run scripts/undeploy.ts"
   },

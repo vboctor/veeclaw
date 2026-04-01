@@ -101,6 +101,7 @@ const REQUIRED_SECRETS = ["OPENROUTER_API_KEY", "TELEGRAM_BOT_TOKEN", "TELEGRAM_
 const OPTIONAL_SECRETS = ["DEFAULT_CHAT_ID", "ALLOWED_CHAT_IDS"] as const;
 const AUTO_GENERATE = ["TELEGRAM_WEBHOOK_SECRET", "AGENT_TOKEN"] as const;
 const GOOGLE_SECRETS = ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_REFRESH_TOKEN"] as const;
+const GITHUB_SECRETS = ["GITHUB_TOKEN"] as const;
 
 const WORKER_SECRETS: Record<string, { required: string[]; optional: string[] }> = {
   "veeclaw-llm-gateway": {
@@ -109,6 +110,10 @@ const WORKER_SECRETS: Record<string, { required: string[]; optional: string[] }>
   },
   "veeclaw-google-connector": {
     required: ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_REFRESH_TOKEN"],
+    optional: [],
+  },
+  "veeclaw-github-connector": {
+    required: ["GITHUB_TOKEN"],
     optional: [],
   },
   "veeclaw-agent": {
@@ -124,6 +129,7 @@ const WORKER_SECRETS: Record<string, { required: string[]; optional: string[] }>
 const DEV_VARS: Record<string, string[]> = {
   "workers/llm-gateway": ["OPENROUTER_API_KEY"],
   "workers/connectors/google": ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_REFRESH_TOKEN"],
+  "workers/connectors/github": ["GITHUB_TOKEN"],
   "workers/agent": ["TELEGRAM_BOT_TOKEN", "AGENT_TOKEN", "DEFAULT_CHAT_ID"],
   "workers/telegram-gateway": ["TELEGRAM_BOT_TOKEN", "TELEGRAM_WEBHOOK_SECRET", "AGENT_TOKEN", "ALLOWED_CHAT_IDS"],
 };
@@ -225,6 +231,18 @@ async function collectSecrets(): Promise<Record<string, string>> {
     if (!val) continue;
     vars[key] = val;
     changed = true;
+  }
+
+  // GitHub Connector secrets
+  for (const key of GITHUB_SECRETS) {
+    if (vars[key] && !FORCE) {
+      log("SKIP", `${key} (already set)`);
+      continue;
+    }
+
+    if (!vars[key]) {
+      log("INFO", `${key} not set — run 'bun run github-auth' to set up GitHub access`);
+    }
   }
 
   if (changed) {
@@ -400,6 +418,7 @@ async function deployWorkers(): Promise<{ telegramUrl?: string }> {
   const workers = [
     { name: "veeclaw-llm-gateway", dir: "workers/llm-gateway" },
     { name: "veeclaw-google-connector", dir: "workers/connectors/google" },
+    { name: "veeclaw-github-connector", dir: "workers/connectors/github" },
     { name: "veeclaw-agent", dir: "workers/agent" },
     { name: "veeclaw-telegram-gateway", dir: "workers/telegram-gateway" },
   ];

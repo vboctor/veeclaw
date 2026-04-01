@@ -33,6 +33,7 @@ export interface Env {
   AGENT_KV: KVNamespace;
   LLM_GATEWAY: Fetcher;
   GOOGLE_CONNECTOR: Fetcher;
+  GITHUB_CONNECTOR: Fetcher;
   TELEGRAM_BOT_TOKEN: string;
   DEFAULT_CHAT_ID: string;
 }
@@ -127,9 +128,8 @@ async function handleComplete(
 ): Promise<Response> {
   const userMessage = getLastUserMessage(req);
   const orchestrator = getOrchestrator();
-  const { tools: skillTools, routes, plugins, prompts } = resolveSkills(
-    orchestrator.skills
-  );
+  const { tools: skillTools, routes, connectorMap, plugins, prompts } =
+    resolveSkills(orchestrator.skills);
 
   const withPrompt = applySystemPrompt(req, orchestrator.prompt, {
     skillPrompts: prompts,
@@ -150,6 +150,7 @@ async function handleComplete(
     request: enriched,
     env,
     routes,
+    connectorMap,
     onDelegateCall: (agentId, task, instructions) =>
       handleDelegation(agentId, task, instructions, env),
   });

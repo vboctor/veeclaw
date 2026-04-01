@@ -8,6 +8,10 @@ import {
   DRIVE_TOOLS,
   DRIVE_TOOL_ROUTES,
 } from "../tools/google.ts";
+import {
+  GITHUB_TOOLS,
+  GITHUB_TOOL_ROUTES,
+} from "../tools/github.ts";
 import { SCHEDULE_TOOLS } from "../tools/schedule.ts";
 
 import GMAIL_SKILL_MD from "./gmail/SKILL.md";
@@ -15,6 +19,7 @@ import CALENDAR_SKILL_MD from "./calendar/SKILL.md";
 import DRIVE_SKILL_MD from "./drive/SKILL.md";
 import WEB_SEARCH_SKILL_MD from "./web_search/SKILL.md";
 import CRON_SKILL_MD from "./cron/SKILL.md";
+import GITHUB_SKILL_MD from "./github/SKILL.md";
 
 export interface SkillConfig {
   id: string;
@@ -24,6 +29,8 @@ export interface SkillConfig {
   prompt: string;
   tools: Tool[];
   routes: Record<string, string>;
+  /** Connector binding name for routing tool calls (e.g., "GOOGLE_CONNECTOR"). */
+  connector?: string;
   plugins?: string[];
   /** Tool names handled internally (not routed to a connector). */
   internalTools?: string[];
@@ -56,6 +63,7 @@ const calendarSkill = parseSkillMd(CALENDAR_SKILL_MD);
 const driveSkill = parseSkillMd(DRIVE_SKILL_MD);
 const webSearchSkill = parseSkillMd(WEB_SEARCH_SKILL_MD);
 const cronSkill = parseSkillMd(CRON_SKILL_MD);
+const githubSkill = parseSkillMd(GITHUB_SKILL_MD);
 
 const SKILLS: Record<string, SkillConfig> = {
   gmail: {
@@ -65,6 +73,7 @@ const SKILLS: Record<string, SkillConfig> = {
     prompt: gmailSkill.prompt,
     tools: GMAIL_TOOLS,
     routes: GMAIL_TOOL_ROUTES,
+    connector: "GOOGLE_CONNECTOR",
   },
   calendar: {
     id: "calendar",
@@ -73,6 +82,7 @@ const SKILLS: Record<string, SkillConfig> = {
     prompt: calendarSkill.prompt,
     tools: CALENDAR_TOOLS,
     routes: CALENDAR_TOOL_ROUTES,
+    connector: "GOOGLE_CONNECTOR",
   },
   drive: {
     id: "drive",
@@ -81,6 +91,7 @@ const SKILLS: Record<string, SkillConfig> = {
     prompt: driveSkill.prompt,
     tools: DRIVE_TOOLS,
     routes: DRIVE_TOOL_ROUTES,
+    connector: "GOOGLE_CONNECTOR",
   },
   web_search: {
     id: "web_search",
@@ -106,17 +117,28 @@ const SKILLS: Record<string, SkillConfig> = {
       "schedule_delete",
     ],
   },
+  github: {
+    id: "github",
+    name: githubSkill.name,
+    description: githubSkill.description,
+    prompt: githubSkill.prompt,
+    tools: GITHUB_TOOLS,
+    routes: GITHUB_TOOL_ROUTES,
+    connector: "GITHUB_CONNECTOR",
+  },
 };
 
 export function resolveSkills(skillIds: string[]): {
   tools: Tool[];
   routes: Record<string, string>;
+  connectorMap: Record<string, string>;
   plugins: string[];
   prompts: string[];
   internalTools: string[];
 } {
   const tools: Tool[] = [];
   const routes: Record<string, string> = {};
+  const connectorMap: Record<string, string> = {};
   const plugins: string[] = [];
   const prompts: string[] = [];
   const internalTools: string[] = [];
@@ -127,6 +149,13 @@ export function resolveSkills(skillIds: string[]): {
 
     tools.push(...skill.tools);
     Object.assign(routes, skill.routes);
+
+    // Map each tool in this skill to its connector binding
+    if (skill.connector) {
+      for (const toolName of Object.keys(skill.routes)) {
+        connectorMap[toolName] = skill.connector;
+      }
+    }
 
     if (skill.prompt) {
       prompts.push(skill.prompt);
@@ -141,5 +170,5 @@ export function resolveSkills(skillIds: string[]): {
     }
   }
 
-  return { tools, routes, plugins, prompts, internalTools };
+  return { tools, routes, connectorMap, plugins, prompts, internalTools };
 }

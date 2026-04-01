@@ -10,6 +10,7 @@ export interface RunAgentOptions {
   request: CompletionRequest;
   env: Env;
   routes: Record<string, string>;
+  connectorMap: Record<string, string>;
   maxRounds?: number;
   onDelegateCall?: (
     agentId: string,
@@ -26,6 +27,7 @@ export async function runAgent(
   const {
     env,
     routes,
+    connectorMap,
     maxRounds = 5,
     onDelegateCall,
     internalToolHandlers,
@@ -68,9 +70,13 @@ export async function runAgent(
     );
 
     // Execute connector-routed tool calls
+    const connectors: Record<string, Fetcher> = {};
+    if (env.GOOGLE_CONNECTOR) connectors.GOOGLE_CONNECTOR = env.GOOGLE_CONNECTOR;
+    if (env.GITHUB_CONNECTOR) connectors.GITHUB_CONNECTOR = env.GITHUB_CONNECTOR;
+
     const connectorResults =
       connectorCalls.length > 0
-        ? await executeToolCalls(connectorCalls, env.GOOGLE_CONNECTOR, routes)
+        ? await executeToolCalls(connectorCalls, connectors, connectorMap, routes)
         : [];
 
     // Execute internal tool calls

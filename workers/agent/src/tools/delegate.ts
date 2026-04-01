@@ -59,9 +59,8 @@ export async function handleDelegation(
     return JSON.stringify({ error: `Unknown agent: ${agentId}` });
   }
 
-  const { tools, routes, plugins, prompts, internalTools } = resolveSkills(
-    agent.skills
-  );
+  const { tools, routes, connectorMap, plugins, prompts, internalTools } =
+    resolveSkills(agent.skills);
 
   let system = agent.prompt;
   if (prompts.length > 0) {
@@ -97,6 +96,7 @@ export async function handleDelegation(
     request,
     env,
     routes,
+    connectorMap,
     internalToolHandlers,
     // No onDelegateCall — sub-agents cannot delegate further
   });

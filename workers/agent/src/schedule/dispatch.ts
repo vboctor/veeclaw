@@ -4,6 +4,7 @@ import type {
   PromptScheduleEntry,
   ActionScheduleEntry,
 } from "@veeclaw/shared";
+import { toTelegramMarkdown } from "@veeclaw/shared";
 import type { Env } from "../index.ts";
 import { loadMemory, loadMemoryData, injectMemory } from "../memory/load.ts";
 import { saveMemoryData } from "../memory/store.ts";
@@ -57,17 +58,29 @@ async function sendTelegram(
   chatId: string,
   text: string
 ): Promise<void> {
-  const chunks = chunkText(text, 4096);
+  const converted = toTelegramMarkdown(text);
+  const chunks = chunkText(converted, 4096);
   for (const chunk of chunks) {
-    await fetch(`${TELEGRAM_API}/bot${botToken}/sendMessage`, {
+    const res = await fetch(`${TELEGRAM_API}/bot${botToken}/sendMessage`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         chat_id: chatId,
         text: chunk,
-        parse_mode: "Markdown",
+        parse_mode: "MarkdownV2",
       }),
     });
+    // Fallback to plain text if MarkdownV2 parsing fails
+    if (!res.ok) {
+      await fetch(`${TELEGRAM_API}/bot${botToken}/sendMessage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          chat_id: chatId,
+          text: chunk,
+        }),
+      });
+    }
   }
 }
 
@@ -100,9 +113,8 @@ async function dispatchPrompt(
   ctx?: ExecutionContext
 ): Promise<void> {
   const orchestrator = getOrchestrator();
-  const { tools: skillTools, routes, plugins, prompts } = resolveSkills(
-    orchestrator.skills
-  );
+  const { tools: skillTools, routes, connectorMap, plugins, prompts } =
+    resolveSkills(orchestrator.skills);
 
   let prompt = orchestrator.prompt;
   if (prompts.length > 0) {
@@ -125,6 +137,7 @@ async function dispatchPrompt(
     request: enriched,
     env,
     routes,
+    connectorMap,
     onDelegateCall: (agentId, task, instructions) =>
       handleDelegation(agentId, task, instructions, env),
   });

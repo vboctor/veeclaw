@@ -2,6 +2,7 @@ import type { Message } from "@veeclaw/shared";
 import { complete, type AgentEnv } from "./agent-client.ts";
 import { getHistory, appendToHistory, clearHistory } from "./history.ts";
 import { chunkText } from "./chunks.ts";
+import { toTelegramMarkdown } from "@veeclaw/shared";
 
 const TELEGRAM_API = "https://api.telegram.org";
 
@@ -47,10 +48,12 @@ async function sendReply(
   chatId: number,
   text: string
 ): Promise<void> {
-  const chunks = chunkText(text);
+  const converted = toTelegramMarkdown(text);
+  const chunks = chunkText(converted);
   for (const chunk of chunks) {
-    const sent = await sendTelegram(botToken, chatId, chunk, "Markdown");
+    const sent = await sendTelegram(botToken, chatId, chunk, "MarkdownV2");
     if (!sent) {
+      // Fallback: send as plain text if MarkdownV2 parsing fails
       await sendTelegram(botToken, chatId, chunk);
     }
   }

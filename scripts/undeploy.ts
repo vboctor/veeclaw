@@ -72,7 +72,7 @@ async function main() {
 
   console.log("  This will delete:");
   console.log("    - Telegram webhook");
-  console.log("    - All 4 Cloudflare Workers");
+  console.log("    - All 5 Cloudflare Workers");
   console.log("    - KV namespaces (AGENT_KV, TOOL_CACHE)");
   console.log("    - Local .dev.vars files");
   console.log("  ");
@@ -110,6 +110,7 @@ async function main() {
   const workers = [
     "veeclaw-telegram-gateway",
     "veeclaw-agent",
+    "veeclaw-github-connector",
     "veeclaw-google-connector",
     "veeclaw-llm-gateway",
   ];
@@ -176,6 +177,7 @@ async function main() {
   const devVarsPaths = [
     "workers/llm-gateway/.dev.vars",
     "workers/connectors/google/.dev.vars",
+    "workers/connectors/github/.dev.vars",
     "workers/agent/.dev.vars",
     "workers/telegram-gateway/.dev.vars",
   ];

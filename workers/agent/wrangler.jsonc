@@ -20,7 +20,8 @@
   // Service bindings
   "services": [
     { "binding": "LLM_GATEWAY", "service": "veeclaw-llm-gateway" },
-    { "binding": "GOOGLE_CONNECTOR", "service": "veeclaw-google-connector" }
+    { "binding": "GOOGLE_CONNECTOR", "service": "veeclaw-google-connector" },
+    { "binding": "GITHUB_CONNECTOR", "service": "veeclaw-github-connector" }
   ],
 
   // Set via `wrangler secret put` or `bun run setup`:

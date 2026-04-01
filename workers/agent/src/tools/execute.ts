@@ -6,7 +6,8 @@ import type { ToolCall, Message } from "@veeclaw/shared";
  */
 async function executeToolCall(
   call: ToolCall,
-  googleConnector: Fetcher,
+  connectors: Record<string, Fetcher>,
+  connectorMap: Record<string, string>,
   routes: Record<string, string>,
 ): Promise<string> {
   const route = routes[call.function.name];
@@ -14,8 +15,16 @@ async function executeToolCall(
     return JSON.stringify({ error: `Unknown tool: ${call.function.name}` });
   }
 
+  const connectorKey = connectorMap[call.function.name];
+  const connector = connectorKey ? connectors[connectorKey] : undefined;
+  if (!connector) {
+    return JSON.stringify({
+      error: `No connector bound for tool: ${call.function.name}`,
+    });
+  }
+
   try {
-    const res = await googleConnector.fetch(`https://internal${route}`, {
+    const res = await connector.fetch(`https://internal${route}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: call.function.arguments,
@@ -41,12 +50,18 @@ async function executeToolCall(
  */
 export async function executeToolCalls(
   toolCalls: ToolCall[],
-  googleConnector: Fetcher,
+  connectors: Record<string, Fetcher>,
+  connectorMap: Record<string, string>,
   routes: Record<string, string>,
 ): Promise<Message[]> {
   const results = await Promise.all(
     toolCalls.map(async (call) => {
-      const result = await executeToolCall(call, googleConnector, routes);
+      const result = await executeToolCall(
+        call,
+        connectors,
+        connectorMap,
+        routes,
+      );
       return {
         role: "tool" as const,
         content: result,

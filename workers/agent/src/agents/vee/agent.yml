@@ -4,3 +4,4 @@ description: Main orchestrator that handles user interaction, manages Google Cal
 model: anthropic/claude-sonnet-4.6
 skills:
   - drive
+  - github

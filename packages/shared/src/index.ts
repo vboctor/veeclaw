@@ -18,3 +18,5 @@ export type {
 } from "./schedule.ts";
 
 export { SCHEDULE_PREFIX } from "./schedule.ts";
+
+export { toTelegramMarkdown } from "./telegram-markdown.ts";

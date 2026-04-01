@@ -10,6 +10,8 @@ import CALEB_YAML from "./caleb/agent.yml";
 import CALEB_PROMPT from "./caleb/prompt.md";
 import EMILY_YAML from "./emily/agent.yml";
 import EMILY_PROMPT from "./emily/prompt.md";
+import CODY_YAML from "./cody/agent.yml";
+import CODY_PROMPT from "./cody/prompt.md";
 
 export interface AgentConfig {
   id: string;
@@ -46,6 +48,7 @@ const AGENTS: Record<string, AgentConfig> = {
   atlas: loadAgent(ATLAS_YAML, ATLAS_PROMPT),
   caleb: loadAgent(CALEB_YAML, CALEB_PROMPT),
   emily: loadAgent(EMILY_YAML, EMILY_PROMPT),
+  cody: loadAgent(CODY_YAML, CODY_PROMPT),
 };
 
 export function getAgent(id: string): AgentConfig | undefined {
