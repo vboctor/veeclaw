@@ -11,6 +11,8 @@ import {
 import {
   GITHUB_TOOLS,
   GITHUB_TOOL_ROUTES,
+  GITHUB_ISSUES_TOOLS,
+  GITHUB_ISSUES_TOOL_ROUTES,
 } from "../tools/github.ts";
 import {
   MANTISHUB_TOOLS,
@@ -28,6 +30,7 @@ import DRIVE_SKILL_MD from "./drive/SKILL.md";
 import WEB_SEARCH_SKILL_MD from "./web_search/SKILL.md";
 import CRON_SKILL_MD from "./cron/SKILL.md";
 import GITHUB_SKILL_MD from "./github/SKILL.md";
+import GITHUB_ISSUES_SKILL_MD from "./github_issues/SKILL.md";
 import MANTISHUB_SKILL_MD from "./mantishub/SKILL.md";
 import TODOIST_SKILL_MD from "./todoist/SKILL.md";
 
@@ -74,6 +77,7 @@ const driveSkill = parseSkillMd(DRIVE_SKILL_MD);
 const webSearchSkill = parseSkillMd(WEB_SEARCH_SKILL_MD);
 const cronSkill = parseSkillMd(CRON_SKILL_MD);
 const githubSkill = parseSkillMd(GITHUB_SKILL_MD);
+const githubIssuesSkill = parseSkillMd(GITHUB_ISSUES_SKILL_MD);
 const mantishubSkill = parseSkillMd(MANTISHUB_SKILL_MD);
 const todoistSkill = parseSkillMd(TODOIST_SKILL_MD);
 
@@ -136,6 +140,15 @@ const SKILLS: Record<string, SkillConfig> = {
     prompt: githubSkill.prompt,
     tools: GITHUB_TOOLS,
     routes: GITHUB_TOOL_ROUTES,
+    connector: "GITHUB_CONNECTOR",
+  },
+  github_issues: {
+    id: "github_issues",
+    name: githubIssuesSkill.name,
+    description: githubIssuesSkill.description,
+    prompt: githubIssuesSkill.prompt,
+    tools: GITHUB_ISSUES_TOOLS,
+    routes: GITHUB_ISSUES_TOOL_ROUTES,
     connector: "GITHUB_CONNECTOR",
   },
   mantishub: {

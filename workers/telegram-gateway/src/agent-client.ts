@@ -9,6 +9,8 @@ export interface AgentEnv {
   AGENT_TOKEN: string;
 }
 
+const AGENT_TIMEOUT_MS = 120_000; // 2 minutes
+
 export async function complete(
   env: AgentEnv,
   messages: Message[],
@@ -17,7 +19,7 @@ export async function complete(
   const body: CompletionRequest = { messages };
   if (model) body.model = model;
 
-  const res = await env.AGENT.fetch("https://internal/v1/complete", {
+  const fetchPromise = env.AGENT.fetch("https://internal/v1/complete", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -25,6 +27,15 @@ export async function complete(
     },
     body: JSON.stringify(body),
   });
+
+  const timeoutPromise = new Promise<never>((_, reject) =>
+    setTimeout(
+      () => reject(new Error("Request timed out — the operation took too long. Try a simpler request.")),
+      AGENT_TIMEOUT_MS,
+    ),
+  );
+
+  const res = await Promise.race([fetchPromise, timeoutPromise]);
 
   if (!res.ok) {
     const text = await res.text();

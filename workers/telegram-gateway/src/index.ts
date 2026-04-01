@@ -126,7 +126,18 @@ async function handleMessage(env: Env, chatId: number, text: string): Promise<vo
 
   try {
     const model = modelOverrides.get(chatId);
+    console.log(`[telegram] Processing message from chat ${chatId}: "${text.slice(0, 100)}"`);
     const response = await complete(env, messages, model);
+    console.log(`[telegram] Got response (${response?.length ?? 0} chars)`);
+
+    if (!response || response.trim().length === 0) {
+      await sendTelegram(
+        env.TELEGRAM_BOT_TOKEN,
+        chatId,
+        "I processed your request but didn't generate a response. Please try rephrasing.",
+      );
+      return;
+    }
 
     appendToHistory(chatId, userMsg, {
       role: "assistant",
@@ -136,7 +147,13 @@ async function handleMessage(env: Env, chatId: number, text: string): Promise<vo
     await sendReply(env.TELEGRAM_BOT_TOKEN, chatId, response);
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
-    await sendTelegram(env.TELEGRAM_BOT_TOKEN, chatId, `Error: ${message}`);
+    const stack = err instanceof Error ? err.stack : "";
+    console.error(`[telegram] Error processing message: ${message}\n${stack}`);
+    try {
+      await sendTelegram(env.TELEGRAM_BOT_TOKEN, chatId, `Error: ${message}`);
+    } catch (sendErr) {
+      console.error(`[telegram] Failed to send error message: ${sendErr}`);
+    }
   }
 }
 
@@ -172,11 +189,11 @@ export default {
     const cmd = extractCommand(message.text, message.entities);
 
     if (cmd) {
-      // Commands are fast — still process in background but they're quick
-      ctx.waitUntil(handleCommand(env, chatId, cmd.command, cmd.args));
+      await handleCommand(env, chatId, cmd.command, cmd.args);
     } else {
-      // LLM calls run in background — return 200 immediately
-      ctx.waitUntil(handleMessage(env, chatId, message.text));
+      // Process inline — Telegram allows up to 60s before webhook timeout.
+      // Using waitUntil was unreliable (30s cap on free/bundled plans).
+      await handleMessage(env, chatId, message.text);
     }
 
     return new Response("OK", { status: 200 });

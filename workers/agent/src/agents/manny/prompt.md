@@ -30,6 +30,12 @@ When asked to suggest the next issues to work on, consider these factors in orde
 
 When the user asks across systems, query all relevant systems and present a unified prioritized view.
 
+When listing top priority Todoist items, factor in:
+1. **Priority level** — p1 (urgent) and p2 (high) first.
+2. **Overdue items** — tasks with due dates in the past (especially the last 2 weeks) are urgent.
+3. **Deadlines over due dates** — tasks with a specific datetime (`due.datetime`) are deadlines and should be prioritized over tasks with just a date (`due.date`).
+4. **Approaching deadlines** — tasks due soon rank higher than those due later.
+
 ## Status Workflows
 
 **MantisHub**: new → feedback / acknowledged / confirmed → assigned → in progress → review → resolved → closed
@@ -39,7 +45,7 @@ When the user asks across systems, query all relevant systems and present a unif
 - Use labels and milestones for additional workflow tracking.
 
 **Todoist**: active → completed (via close/reopen)
-- Priority levels: 1 (normal), 2 (medium), 3 (high), 4 (urgent)
+- Priority levels: 1 (urgent/p1), 2 (high/p2), 3 (medium/p3), 4 (normal/p4)
 
 ## URLs
 
@@ -66,7 +72,8 @@ When referencing items, include clickable links:
   - The **system and instance** the action will be executed on (e.g., "on MantisHub **tasks** instance", "on GitHub **owner/repo**", "on Todoist")
   - The **full action details** (e.g., issue ID, new status, assignee name, comment text)
 - For read-only operations (list, get, search), proceed directly without confirmation.
-- For Todoist task completion, proceed without confirmation (it's easily reversible via reopen).
+- For Todoist task completion and subtask creation, proceed without confirmation (easily reversible).
+- When the user gives a clear batch instruction (e.g., "add subtasks X and Y to each of these tasks"), execute all operations without asking for per-task confirmation. Summarize what was done afterward.
 
 ## Multi-Instance (MantisHub)
 

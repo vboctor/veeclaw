@@ -5,4 +5,4 @@ model: anthropic/claude-sonnet-4.6
 skills:
   - mantishub
   - todoist
-  - github
+  - github_issues

@@ -7,6 +7,7 @@ export const TODOIST_TOOL_ROUTES: Record<string, string> = {
   todoist_tasks_get: "/v1/todoist/tasks/get",
   todoist_tasks_create: "/v1/todoist/tasks/create",
   todoist_tasks_update: "/v1/todoist/tasks/update",
+  todoist_tasks_subtasks: "/v1/todoist/tasks/subtasks",
   todoist_tasks_complete: "/v1/todoist/tasks/complete",
   todoist_tasks_reopen: "/v1/todoist/tasks/reopen",
   todoist_projects_list: "/v1/todoist/projects/list",
@@ -39,10 +40,18 @@ export const TODOIST_TOOLS: Tool[] = [
             type: "string",
             description: "Filter by label name",
           },
-          filter: {
-            type: "string",
+          search: {
             description:
-              "Todoist filter query (e.g., 'today', 'overdue', 'priority 1', 'due before: tomorrow', '#ProjectName')",
+              "Search tasks by content/description. A single string or an array of phrases (OR match). Case-insensitive. Examples: 'tax return' or ['tax return', 'insurance', 'lease']",
+            oneOf: [
+              { type: "string" },
+              { type: "array", items: { type: "string" } },
+            ],
+          },
+          limit: {
+            type: "number",
+            description:
+              "Max number of tasks to return. Results are sorted by most recently created first.",
           },
         },
       },
@@ -93,7 +102,7 @@ export const TODOIST_TOOLS: Tool[] = [
           priority: {
             type: "number",
             description:
-              "Priority: 1 (normal), 2 (medium), 3 (high), 4 (urgent)",
+              "Priority: 1 (urgent/p1), 2 (high/p2), 3 (medium/p3), 4 (normal/p4). Matches Todoist UI.",
           },
           dueString: {
             type: "string",
@@ -146,6 +155,23 @@ export const TODOIST_TOOLS: Tool[] = [
           dueDatetime: {
             type: "string",
             description: "New due datetime (RFC3339)",
+          },
+        },
+        required: ["taskId"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "todoist_tasks_subtasks",
+      description: "List subtasks of a specific Todoist task",
+      parameters: {
+        type: "object",
+        properties: {
+          taskId: {
+            type: "string",
+            description: "Parent task ID to get subtasks for",
           },
         },
         required: ["taskId"],

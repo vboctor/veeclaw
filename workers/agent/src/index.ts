@@ -153,6 +153,7 @@ async function handleComplete(
     env,
     routes,
     connectorMap,
+    maxRounds: 10,
     onDelegateCall: (agentId, task, instructions) =>
       handleDelegation(agentId, task, instructions, env),
   });

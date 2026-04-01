@@ -4,6 +4,7 @@ import {
   handleTasksGet,
   handleTasksCreate,
   handleTasksUpdate,
+  handleTasksSubtasks,
   handleTasksComplete,
   handleTasksReopen,
 } from "./tasks.ts";
@@ -26,6 +27,7 @@ export default {
       case "/v1/todoist/tasks/get":      return handleTasksGet(env, request);
       case "/v1/todoist/tasks/create":   return handleTasksCreate(env, request);
       case "/v1/todoist/tasks/update":   return handleTasksUpdate(env, request);
+      case "/v1/todoist/tasks/subtasks": return handleTasksSubtasks(env, request);
       case "/v1/todoist/tasks/complete": return handleTasksComplete(env, request);
       case "/v1/todoist/tasks/reopen":   return handleTasksReopen(env, request);
 
