@@ -130,7 +130,13 @@ async function dispatchPrompt(
 
   const withPrompt = applySystemPrompt(req, prompt);
   const memory = await loadMemory(env.AGENT_KV);
-  const enriched = injectMemory(withPrompt, memory);
+  // Only inject facts (user preferences, timezone) — not conversation history
+  const factsOnly: typeof memory = {
+    messages: [],
+    summaryBlock: null,
+    factsBlock: memory.factsBlock,
+  };
+  const enriched = injectMemory(withPrompt, factsOnly);
 
   const data = await runAgent({
     request: enriched,
