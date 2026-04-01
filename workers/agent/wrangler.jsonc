@@ -22,7 +22,8 @@
     { "binding": "LLM_GATEWAY", "service": "veeclaw-llm-gateway" },
     { "binding": "GOOGLE_CONNECTOR", "service": "veeclaw-google-connector" },
     { "binding": "GITHUB_CONNECTOR", "service": "veeclaw-github-connector" },
-    { "binding": "MANTISHUB_CONNECTOR", "service": "veeclaw-mantishub-connector" }
+    { "binding": "MANTISHUB_CONNECTOR", "service": "veeclaw-mantishub-connector" },
+    { "binding": "TODOIST_CONNECTOR", "service": "veeclaw-todoist-connector" }
   ],
 
   // Set via `wrangler secret put` or `bun run setup`:

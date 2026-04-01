@@ -1,6 +1,8 @@
 id: manny
 name: Manny
-description: MantisHub issue tracker specialist — triages issues, manages priorities, suggests next tasks
+description: Task and issue management specialist — handles GitHub issues, MantisHub issues, and Todoist TODOs
 model: anthropic/claude-sonnet-4.6
 skills:
   - mantishub
+  - todoist
+  - github

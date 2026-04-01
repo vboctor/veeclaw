@@ -1,6 +1,6 @@
 id: cody
 name: Cody
-description: Code review and GitHub specialist — reviews PRs, examines code, manages issues
+description: Code review specialist — reviews PRs, examines diffs, reads source code
 model: anthropic/claude-sonnet-4.6
 skills:
   - github

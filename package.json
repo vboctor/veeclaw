@@ -22,10 +22,13 @@
     "deploy:github": "cd workers/connectors/github && bunx wrangler deploy",
     "dev:mantishub": "cd workers/connectors/mantishub && bunx wrangler dev",
     "deploy:mantishub": "cd workers/connectors/mantishub && bunx wrangler deploy",
+    "dev:todoist": "cd workers/connectors/todoist && bunx wrangler dev",
+    "deploy:todoist": "cd workers/connectors/todoist && bunx wrangler deploy",
     "google-auth": "bun run scripts/google-auth.ts",
     "github-auth": "bun run scripts/github-auth.ts",
     "mantishub-auth": "bun run scripts/mantishub-auth.ts",
-    "deploy": "bun run deploy:gateway && bun run deploy:google && bun run deploy:github && bun run deploy:mantishub && bun run deploy:agent && bun run deploy:telegram",
+    "todoist-auth": "bun run scripts/todoist-auth.ts",
+    "deploy": "bun run deploy:gateway && bun run deploy:google && bun run deploy:github && bun run deploy:mantishub && bun run deploy:todoist && bun run deploy:agent && bun run deploy:telegram",
     "setup": "bun run scripts/setup.ts",
     "undeploy": "bun run scripts/undeploy.ts"
   },
@@ -43,6 +46,7 @@
     "ink-text-input": "^6.0.0",
     "marked": "15",
     "marked-terminal": "^7.3.0",
-    "react": "^19.2.4"
+    "react": "^19.2.4",
+    "wrangler": "^4.79.0"
   }
 }

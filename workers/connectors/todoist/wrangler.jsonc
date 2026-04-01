@@ -1,0 +1,9 @@
+{
+  "name": "veeclaw-todoist-connector",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-03-27",
+  "compatibility_flags": ["nodejs_compat"]
+
+  // Set via `wrangler secret put` or `bun run setup`:
+  //   TODOIST_TOKEN
+}

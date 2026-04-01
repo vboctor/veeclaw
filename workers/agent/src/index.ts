@@ -35,6 +35,7 @@ export interface Env {
   GOOGLE_CONNECTOR: Fetcher;
   GITHUB_CONNECTOR: Fetcher;
   MANTISHUB_CONNECTOR: Fetcher;
+  TODOIST_CONNECTOR: Fetcher;
   TELEGRAM_BOT_TOKEN: string;
   DEFAULT_CHAT_ID: string;
 }

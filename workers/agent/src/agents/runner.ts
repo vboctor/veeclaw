@@ -74,6 +74,7 @@ export async function runAgent(
     if (env.GOOGLE_CONNECTOR) connectors.GOOGLE_CONNECTOR = env.GOOGLE_CONNECTOR;
     if (env.GITHUB_CONNECTOR) connectors.GITHUB_CONNECTOR = env.GITHUB_CONNECTOR;
     if (env.MANTISHUB_CONNECTOR) connectors.MANTISHUB_CONNECTOR = env.MANTISHUB_CONNECTOR;
+    if (env.TODOIST_CONNECTOR) connectors.TODOIST_CONNECTOR = env.TODOIST_CONNECTOR;
 
     const connectorResults =
       connectorCalls.length > 0

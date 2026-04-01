@@ -103,6 +103,7 @@ const AUTO_GENERATE = ["TELEGRAM_WEBHOOK_SECRET", "AGENT_TOKEN"] as const;
 const GOOGLE_SECRETS = ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_REFRESH_TOKEN"] as const;
 const GITHUB_SECRETS = ["GITHUB_TOKEN"] as const;
 const MANTISHUB_SECRETS = ["MANTISHUB_INSTANCES"] as const;
+const TODOIST_SECRETS = ["TODOIST_TOKEN"] as const;
 
 const WORKER_SECRETS: Record<string, { required: string[]; optional: string[] }> = {
   "veeclaw-llm-gateway": {
@@ -121,6 +122,10 @@ const WORKER_SECRETS: Record<string, { required: string[]; optional: string[] }>
     required: [],
     optional: [],
   },
+  "veeclaw-todoist-connector": {
+    required: ["TODOIST_TOKEN"],
+    optional: [],
+  },
   "veeclaw-agent": {
     required: ["TELEGRAM_BOT_TOKEN", "AGENT_TOKEN"],
     optional: ["DEFAULT_CHAT_ID"],
@@ -136,6 +141,7 @@ const DEV_VARS: Record<string, string[]> = {
   "workers/connectors/google": ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_REFRESH_TOKEN"],
   "workers/connectors/github": ["GITHUB_TOKEN"],
   "workers/connectors/mantishub": [],
+  "workers/connectors/todoist": ["TODOIST_TOKEN"],
   "workers/agent": ["TELEGRAM_BOT_TOKEN", "AGENT_TOKEN", "DEFAULT_CHAT_ID"],
   "workers/telegram-gateway": ["TELEGRAM_BOT_TOKEN", "TELEGRAM_WEBHOOK_SECRET", "AGENT_TOKEN", "ALLOWED_CHAT_IDS"],
 };
@@ -260,6 +266,18 @@ async function collectSecrets(): Promise<Record<string, string>> {
 
     if (!vars[key]) {
       log("INFO", `${key} not set — run 'bun run mantishub-auth' to add MantisHub instances`);
+    }
+  }
+
+  // Todoist Connector secrets
+  for (const key of TODOIST_SECRETS) {
+    if (vars[key] && !FORCE) {
+      log("SKIP", `${key} (already set)`);
+      continue;
+    }
+
+    if (!vars[key]) {
+      log("INFO", `${key} not set — run 'bun run todoist-auth' to set up Todoist access`);
     }
   }
 
@@ -572,6 +590,7 @@ async function deployWorkers(): Promise<{ telegramUrl?: string }> {
     { name: "veeclaw-google-connector", dir: "workers/connectors/google" },
     { name: "veeclaw-github-connector", dir: "workers/connectors/github" },
     { name: "veeclaw-mantishub-connector", dir: "workers/connectors/mantishub" },
+    { name: "veeclaw-todoist-connector", dir: "workers/connectors/todoist" },
     { name: "veeclaw-agent", dir: "workers/agent" },
     { name: "veeclaw-telegram-gateway", dir: "workers/telegram-gateway" },
   ];
