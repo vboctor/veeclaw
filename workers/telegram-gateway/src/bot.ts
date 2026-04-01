@@ -82,7 +82,12 @@ export function createBot(env: BotEnv): Bot {
 
       const chunks = chunkText(response);
       for (const chunk of chunks) {
-        await ctx.reply(chunk);
+        try {
+          await ctx.reply(chunk, { parse_mode: "Markdown" });
+        } catch {
+          // Fallback to plain text if Markdown parsing fails
+          await ctx.reply(chunk);
+        }
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unknown error";

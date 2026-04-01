@@ -22,7 +22,9 @@ export default {
     }
 
     const bot = createBot(env);
-    const handler = webhookCallback(bot, "cloudflare-mod");
+    const handler = webhookCallback(bot, "cloudflare-mod", {
+      timeoutMilliseconds: 55_000,
+    });
 
     return handler(request);
   },
