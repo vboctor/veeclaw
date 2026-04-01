@@ -30,7 +30,27 @@ export async function runHeartbeat(env: Env): Promise<void> {
 
   console.log(`[agent:heartbeat] ${due.length} entries due, dispatching...`);
 
-  // Dispatch all due entries
+  // CRITICAL: Update nextRun BEFORE dispatching to prevent duplicate runs.
+  // If dispatch takes longer than 1 minute, the next heartbeat would see the
+  // same nextRun and dispatch again. By advancing nextRun first, concurrent
+  // heartbeats will skip these entries.
+  for (const entry of due) {
+    if (entry.type === "recurring" && entry.cron) {
+      entries[entry.id] = {
+        ...entry,
+        nextRun: computeNextRun(entry.cron, now),
+      };
+    } else if (entry.type === "one-shot") {
+      // Set nextRun far in the future to prevent re-dispatch; will be cleaned up after dispatch
+      entries[entry.id] = {
+        ...entry,
+        nextRun: now + 365 * 24 * 60 * 60 * 1000,
+      };
+    }
+  }
+  await saveAll(env.AGENT_KV, entries);
+
+  // Now dispatch (may take a while due to LLM calls)
   const results = await Promise.all(
     due.map(async (entry) => ({
       entry,
@@ -38,40 +58,43 @@ export async function runHeartbeat(env: Env): Promise<void> {
     }))
   );
 
-  // Update entries in-place, then do a single KV write
+  // Post-dispatch: update run counts and clean up one-shots
+  // Re-load entries in case they were modified during dispatch
+  const fresh = await loadAll(env.AGENT_KV);
   let changed = false;
+
   for (const { entry, ok } of results) {
+    const current = fresh[entry.id];
+    if (!current) continue;
+
     const newRunCount = entry.runCount + 1;
 
     if (entry.type === "one-shot") {
-      delete entries[entry.id];
+      delete fresh[entry.id];
       changed = true;
       continue;
     }
 
     if (entry.maxRuns !== undefined && newRunCount >= entry.maxRuns) {
       console.log(`[agent:heartbeat] ${entry.id} reached maxRuns (${entry.maxRuns}), removing`);
-      delete entries[entry.id];
+      delete fresh[entry.id];
       changed = true;
       continue;
     }
 
-    if (entry.cron) {
-      entries[entry.id] = {
-        ...entry,
-        nextRun: computeNextRun(entry.cron, now),
-        lastRun: now,
-        lastRunStatus: ok ? "success" : "failure",
-        runCount: newRunCount,
-        successCount: (entry.successCount ?? 0) + (ok ? 1 : 0),
-        failureCount: (entry.failureCount ?? 0) + (ok ? 0 : 1),
-      };
-      changed = true;
-    }
+    fresh[entry.id] = {
+      ...current,
+      lastRun: now,
+      lastRunStatus: ok ? "success" : "failure",
+      runCount: newRunCount,
+      successCount: (entry.successCount ?? 0) + (ok ? 1 : 0),
+      failureCount: (entry.failureCount ?? 0) + (ok ? 0 : 1),
+    };
+    changed = true;
   }
 
   if (changed) {
-    await saveAll(env.AGENT_KV, entries);
+    await saveAll(env.AGENT_KV, fresh);
   }
 }
 
