@@ -29,6 +29,7 @@ export interface CompletionRequest {
   tools?: Tool[];
   model?: string;
   stream?: boolean;
+  plugins?: string[];
 }
 
 export interface CompletionResponse {

@@ -1,0 +1,7 @@
+id: caleb
+name: Caleb
+description: Scheduling and calendar specialist — manages scheduled tasks, reminders, recurring jobs, and Google Calendar events
+model: anthropic/claude-sonnet-4.6
+skills:
+  - cron
+  - calendar

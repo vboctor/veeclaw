@@ -1,0 +1,6 @@
+id: emily
+name: Emily
+description: Email specialist — triages emails, stars important ones, drafts and sends emails with user confirmation
+model: anthropic/claude-sonnet-4.6
+skills:
+  - gmail

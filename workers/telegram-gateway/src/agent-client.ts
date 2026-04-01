@@ -17,14 +17,12 @@ export async function complete(
   const body: CompletionRequest = { messages };
   if (model) body.model = model;
 
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-  };
-  headers["Authorization"] = `Bearer ${env.AGENT_TOKEN}`;
-
   const res = await env.AGENT.fetch("https://internal/v1/complete", {
     method: "POST",
-    headers,
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${env.AGENT_TOKEN}`,
+    },
     body: JSON.stringify(body),
   });
 

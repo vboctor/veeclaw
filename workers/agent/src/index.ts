@@ -9,11 +9,6 @@ import { injectMemory } from "./memory/load.ts";
 import { saveMemoryData } from "./memory/store.ts";
 import { appendToWorkingMemory } from "./memory/update.ts";
 import { extractFacts } from "./memory/extract.ts";
-import { loadScheduleContext } from "./schedule/context.ts";
-import {
-  extractScheduleCommands,
-  processScheduleCommands,
-} from "./schedule/extract.ts";
 import {
   listSchedules,
   getSchedule,
@@ -24,9 +19,14 @@ import {
 } from "./schedule/store.ts";
 import { runHeartbeat } from "./schedule/heartbeat.ts";
 import { dispatchScheduleEntry } from "./schedule/dispatch.ts";
-import { GOOGLE_TOOLS } from "./tools/google.ts";
-import { executeToolCalls } from "./tools/execute.ts";
-import SYSTEM_PROMPT from "./prompts/system.md";
+import { getOrchestrator } from "./agents/loader.ts";
+import { resolveSkills } from "./skills/registry.ts";
+import { runAgent } from "./agents/runner.ts";
+import {
+  DELEGATE_TOOL,
+  handleDelegation,
+  buildAgentListing,
+} from "./tools/delegate.ts";
 
 export interface Env {
   AGENT_TOKEN: string;
@@ -37,12 +37,28 @@ export interface Env {
   DEFAULT_CHAT_ID: string;
 }
 
-function applySystemPrompt(req: CompletionRequest): CompletionRequest {
+function applySystemPrompt(
+  req: CompletionRequest,
+  prompt: string,
+  opts: {
+    skillPrompts?: string[];
+  } = {}
+): CompletionRequest {
   const now = new Date();
-  const pdt = new Date(now.toLocaleString("en-US", { timeZone: "America/Los_Angeles" }));
+  const pdt = new Date(
+    now.toLocaleString("en-US", { timeZone: "America/Los_Angeles" })
+  );
   const timeContext = `Current datetime: ${now.toISOString()} | User's local time: ${pdt.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })} ${pdt.toLocaleTimeString("en-US", { hour12: true })} (America/Los_Angeles). Do not search for the current time — use this value directly.`;
 
-  const base = `${SYSTEM_PROMPT}\n\n${timeContext}`;
+  const agentListing = buildAgentListing();
+  const parts = [prompt, agentListing, timeContext];
+
+  // Full skill prompts — injected for active skills
+  if (opts.skillPrompts?.length) {
+    parts.push(...opts.skillPrompts);
+  }
+
+  const base = parts.join("\n\n");
   const system = req.system ? `${base}\n\n---\n\n${req.system}` : base;
   return { ...req, system };
 }
@@ -63,16 +79,6 @@ function getLastUserMessage(req: CompletionRequest): string {
   return "";
 }
 
-function injectScheduleContext(
-  req: CompletionRequest,
-  scheduleContext: string
-): CompletionRequest {
-  const system = req.system
-    ? `${req.system}\n\n---\n\n${scheduleContext}`
-    : scheduleContext;
-  return { ...req, system };
-}
-
 async function processMemoryInBackground(
   kv: KVNamespace,
   llmGateway: Fetcher,
@@ -80,10 +86,19 @@ async function processMemoryInBackground(
   assistantResponse: string
 ): Promise<void> {
   try {
-    // Single KV read, sequential updates, single KV write
     let data = await loadMemoryData(kv);
-    data = await appendToWorkingMemory(data, llmGateway, userMessage, assistantResponse);
-    data = await extractFacts(data, llmGateway, userMessage, assistantResponse);
+    data = await appendToWorkingMemory(
+      data,
+      llmGateway,
+      userMessage,
+      assistantResponse
+    );
+    data = await extractFacts(
+      data,
+      llmGateway,
+      userMessage,
+      assistantResponse
+    );
     await saveMemoryData(kv, data);
   } catch {
     // Memory ops are best-effort — never break the primary flow
@@ -105,76 +120,43 @@ async function callLLMGateway(
 
 // ── Completion handlers ───────────────────────────────────────────
 
-const MAX_TOOL_ROUNDS = 5;
-
 async function handleComplete(
   req: CompletionRequest,
   env: Env,
   ctx: ExecutionContext
 ): Promise<Response> {
   const userMessage = getLastUserMessage(req);
-  const withPrompt = applySystemPrompt(req);
+  const orchestrator = getOrchestrator();
+  const { tools: skillTools, routes, plugins, prompts } = resolveSkills(
+    orchestrator.skills
+  );
+
+  const withPrompt = applySystemPrompt(req, orchestrator.prompt, {
+    skillPrompts: prompts,
+  });
 
   const memory = await loadMemory(env.AGENT_KV);
-  let scheduleContext: string | null = null;
-  try {
-    scheduleContext = await loadScheduleContext(env.AGENT_KV, userMessage);
-  } catch {
-    // Schedule context is best-effort
-  }
   let enriched = injectMemory(withPrompt, memory);
-  if (scheduleContext) {
-    enriched = injectScheduleContext(enriched, scheduleContext);
-  }
 
-  // Inject tools
-  enriched = { ...enriched, tools: GOOGLE_TOOLS };
+  // Inject tools: skill tools + delegation tool
+  enriched = {
+    ...enriched,
+    tools: [...skillTools, DELEGATE_TOOL],
+    model: orchestrator.model,
+    plugins: plugins.length > 0 ? plugins : undefined,
+  };
 
-  // Tool execution loop
-  let currentReq = enriched;
-  let data: CompletionResponse;
-
-  for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-    const response = await callLLMGateway(env, currentReq, false);
-
-    if (!response.ok) {
-      const text = await response.text();
-      return new Response(text, { status: response.status });
-    }
-
-    data = (await response.json()) as CompletionResponse;
-
-    // If no tool calls, we have the final response
-    if (!data.tool_calls?.length) break;
-
-    // Execute tool calls
-    const toolResults = await executeToolCalls(data.tool_calls, env.GOOGLE_CONNECTOR);
-
-    // Append assistant message (with tool_calls) and tool results to conversation
-    const assistantMsg: Message = {
-      role: "assistant",
-      content: data.content || "",
-      tool_calls: data.tool_calls,
-    };
-
-    currentReq = {
-      ...currentReq,
-      messages: [...currentReq.messages, assistantMsg, ...toolResults],
-    };
-  }
-
-  const rawResponse = data!.content;
-  const { cleanContent, commands } = extractScheduleCommands(rawResponse);
-
-  if (commands.length > 0) {
-    ctx.waitUntil(
-      processScheduleCommands(env.AGENT_KV, commands).catch(() => {})
-    );
-  }
+  const data = await runAgent({
+    request: enriched,
+    env,
+    routes,
+    onDelegateCall: (agentId, task, instructions) =>
+      handleDelegation(agentId, task, instructions, env),
+  });
 
   const result: CompletionResponse = {
-    ...data!,
-    content: cleanContent,
+    ...data,
+    content: data.content,
     tool_calls: undefined,
   };
 
@@ -183,7 +165,7 @@ async function handleComplete(
       env.AGENT_KV,
       env.LLM_GATEWAY,
       userMessage,
-      cleanContent
+      data.content
     )
   );
 
@@ -225,19 +207,21 @@ async function handleStream(
   ctx: ExecutionContext
 ): Promise<Response> {
   const userMessage = getLastUserMessage(req);
-  const withPrompt = applySystemPrompt(req);
+  const orchestrator = getOrchestrator();
+  const { plugins, prompts } = resolveSkills(orchestrator.skills);
+
+  const withPrompt = applySystemPrompt(req, orchestrator.prompt, {
+    skillPrompts: prompts,
+  });
 
   const memory = await loadMemory(env.AGENT_KV);
-  let scheduleCtx: string | null = null;
-  try {
-    scheduleCtx = await loadScheduleContext(env.AGENT_KV, userMessage);
-  } catch {
-    // Schedule context is best-effort
-  }
   let enriched = injectMemory(withPrompt, memory);
-  if (scheduleCtx) {
-    enriched = injectScheduleContext(enriched, scheduleCtx);
-  }
+
+  enriched = {
+    ...enriched,
+    model: orchestrator.model,
+    plugins: plugins.length > 0 ? plugins : undefined,
+  };
 
   const response = await callLLMGateway(env, enriched, true);
 
@@ -249,21 +233,13 @@ async function handleStream(
   const [clientStream, captureStream] = response.body!.tee();
 
   ctx.waitUntil(
-    collectStreamContent(captureStream).then(async (rawResponse) => {
-      const { cleanContent, commands } =
-        extractScheduleCommands(rawResponse);
-
-      await Promise.all([
-        processMemoryInBackground(
-          env.AGENT_KV,
-          env.LLM_GATEWAY,
-          userMessage,
-          cleanContent
-        ),
-        commands.length > 0
-          ? processScheduleCommands(env.AGENT_KV, commands).catch(() => {})
-          : Promise.resolve(),
-      ]);
+    collectStreamContent(captureStream).then(async (content) => {
+      await processMemoryInBackground(
+        env.AGENT_KV,
+        env.LLM_GATEWAY,
+        userMessage,
+        content
+      );
     })
   );
 
@@ -309,13 +285,18 @@ async function handleScheduleRoutes(
 
   if (request.method === "PUT" && url.pathname.startsWith("/v1/schedules/")) {
     const id = url.pathname.slice("/v1/schedules/".length);
-    const updates = (await request.json()) as Parameters<typeof updateSchedule>[2];
+    const updates = (await request.json()) as Parameters<
+      typeof updateSchedule
+    >[2];
     const updated = await updateSchedule(kv, id, updates);
     if (!updated) return new Response("Not found", { status: 404 });
     return Response.json(updated);
   }
 
-  if (request.method === "DELETE" && url.pathname.startsWith("/v1/schedules/")) {
+  if (
+    request.method === "DELETE" &&
+    url.pathname.startsWith("/v1/schedules/")
+  ) {
     const id = url.pathname.slice("/v1/schedules/".length);
     const deleted = await deleteSchedule(kv, id);
     if (!deleted) return new Response("Not found", { status: 404 });

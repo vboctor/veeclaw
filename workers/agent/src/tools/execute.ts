@@ -1,5 +1,4 @@
 import type { ToolCall, Message } from "@veeclaw/shared";
-import { GOOGLE_TOOL_ROUTES } from "./google.ts";
 
 /**
  * Execute a tool call by routing it to the appropriate connector.
@@ -8,8 +7,9 @@ import { GOOGLE_TOOL_ROUTES } from "./google.ts";
 async function executeToolCall(
   call: ToolCall,
   googleConnector: Fetcher,
+  routes: Record<string, string>,
 ): Promise<string> {
-  const route = GOOGLE_TOOL_ROUTES[call.function.name];
+  const route = routes[call.function.name];
   if (!route) {
     return JSON.stringify({ error: `Unknown tool: ${call.function.name}` });
   }
@@ -42,10 +42,11 @@ async function executeToolCall(
 export async function executeToolCalls(
   toolCalls: ToolCall[],
   googleConnector: Fetcher,
+  routes: Record<string, string>,
 ): Promise<Message[]> {
   const results = await Promise.all(
     toolCalls.map(async (call) => {
-      const result = await executeToolCall(call, googleConnector);
+      const result = await executeToolCall(call, googleConnector, routes);
       return {
         role: "tool" as const,
         content: result,

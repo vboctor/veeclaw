@@ -5,6 +5,7 @@ import {
   handleGmailSend,
   handleGmailDraft,
   handleGmailUnread,
+  handleGmailStar,
 } from "./gmail.ts";
 import {
   handleCalendarList,
@@ -37,6 +38,7 @@ export default {
       case "/v1/gmail/send":     return handleGmailSend(env, request);
       case "/v1/gmail/draft":    return handleGmailDraft(env, request);
       case "/v1/gmail/unread":   return handleGmailUnread(env, request);
+      case "/v1/gmail/star":    return handleGmailStar(env, request);
 
       // Calendar
       case "/v1/calendar/list":   return handleCalendarList(env, request);

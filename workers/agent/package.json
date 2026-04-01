@@ -11,7 +11,8 @@
   },
   "dependencies": {
     "@veeclaw/shared": "workspace:*",
-    "cron-parser": "^5.0.6"
+    "cron-parser": "^5.0.6",
+    "yaml": "^2.8.3"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20250312.0",

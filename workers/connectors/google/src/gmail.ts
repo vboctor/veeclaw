@@ -201,3 +201,28 @@ export async function handleGmailUnread(env: Env, request: Request): Promise<Res
 
   return Response.json({ messages: messages.filter(Boolean) });
 }
+
+export async function handleGmailStar(env: Env, request: Request): Promise<Response> {
+  const { messageId, star = true } = (await request.json()) as {
+    messageId: string;
+    star?: boolean;
+  };
+
+  if (!messageId) return Response.json({ error: "messageId is required" }, { status: 400 });
+
+  const { data, error } = await googleJson<{ id: string; labelIds: string[] }>(
+    env,
+    `${GMAIL_BASE}/messages/${messageId}/modify`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        addLabelIds: star ? ["STARRED"] : [],
+        removeLabelIds: star ? [] : ["STARRED"],
+      }),
+    },
+  );
+  if (error) return error;
+
+  return Response.json(data);
+}

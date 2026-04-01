@@ -7,6 +7,7 @@ export const GOOGLE_TOOL_ROUTES: Record<string, string> = {
   gmail_send: "/v1/gmail/send",
   gmail_draft: "/v1/gmail/draft",
   gmail_unread: "/v1/gmail/unread",
+  gmail_star: "/v1/gmail/star",
   calendar_list: "/v1/calendar/list",
   calendar_get: "/v1/calendar/get",
   calendar_create: "/v1/calendar/create",
@@ -18,8 +19,18 @@ export const GOOGLE_TOOL_ROUTES: Record<string, string> = {
   drive_download: "/v1/drive/download",
 };
 
-export const GOOGLE_TOOLS: Tool[] = [
-  // ── Gmail ─────────────────────────────────────────────────────────
+// ── Gmail ─────────────────────────────────────────────────────────
+
+export const GMAIL_TOOL_ROUTES: Record<string, string> = {
+  gmail_search: "/v1/gmail/search",
+  gmail_read: "/v1/gmail/read",
+  gmail_send: "/v1/gmail/send",
+  gmail_draft: "/v1/gmail/draft",
+  gmail_unread: "/v1/gmail/unread",
+  gmail_star: "/v1/gmail/star",
+};
+
+export const GMAIL_TOOLS: Tool[] = [
   {
     type: "function",
     function: {
@@ -54,7 +65,7 @@ export const GOOGLE_TOOLS: Tool[] = [
     type: "function",
     function: {
       name: "gmail_send",
-      description: "Send an email via Gmail",
+      description: "Send an email via Gmail. IMPORTANT: Never call this without explicit user confirmation first.",
       parameters: {
         type: "object",
         properties: {
@@ -100,8 +111,34 @@ export const GOOGLE_TOOLS: Tool[] = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "gmail_star",
+      description: "Star or unstar a Gmail message",
+      parameters: {
+        type: "object",
+        properties: {
+          messageId: { type: "string", description: "Gmail message ID" },
+          star: { type: "boolean", description: "true to star, false to unstar (default true)" },
+        },
+        required: ["messageId"],
+      },
+    },
+  },
+];
 
-  // ── Calendar ──────────────────────────────────────────────────────
+// ── Calendar ──────────────────────────────────────────────────────
+
+export const CALENDAR_TOOL_ROUTES: Record<string, string> = {
+  calendar_list: "/v1/calendar/list",
+  calendar_get: "/v1/calendar/get",
+  calendar_create: "/v1/calendar/create",
+  calendar_update: "/v1/calendar/update",
+  calendar_delete: "/v1/calendar/delete",
+};
+
+export const CALENDAR_TOOLS: Tool[] = [
   {
     type: "function",
     function: {
@@ -173,7 +210,6 @@ export const GOOGLE_TOOLS: Tool[] = [
       },
     },
   },
-
   {
     type: "function",
     function: {
@@ -189,8 +225,18 @@ export const GOOGLE_TOOLS: Tool[] = [
       },
     },
   },
+];
 
-  // ── Drive ─────────────────────────────────────────────────────────
+// ── Drive ─────────────────────────────────────────────────────────
+
+export const DRIVE_TOOL_ROUTES: Record<string, string> = {
+  drive_list: "/v1/drive/list",
+  drive_search: "/v1/drive/search",
+  drive_get: "/v1/drive/get",
+  drive_download: "/v1/drive/download",
+};
+
+export const DRIVE_TOOLS: Tool[] = [
   {
     type: "function",
     function: {
@@ -251,3 +297,6 @@ export const GOOGLE_TOOLS: Tool[] = [
     },
   },
 ];
+
+// ── Combined (kept for backward compatibility) ────────────────────
+export const GOOGLE_TOOLS: Tool[] = [...GMAIL_TOOLS, ...CALENDAR_TOOLS, ...DRIVE_TOOLS];

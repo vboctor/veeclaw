@@ -1,0 +1,6 @@
+id: vee
+name: Vee
+description: Main orchestrator that handles user interaction, manages Google Calendar and Drive, and delegates to specialist agents
+model: anthropic/claude-sonnet-4.6
+skills:
+  - drive

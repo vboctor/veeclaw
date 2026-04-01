@@ -1,0 +1,6 @@
+id: atlas
+name: Atlas
+description: Travel planning specialist — researches flights, hotels, itineraries, and travel logistics
+model: anthropic/claude-sonnet-4.6
+skills:
+  - web_search

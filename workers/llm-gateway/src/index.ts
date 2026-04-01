@@ -35,9 +35,12 @@ async function handleComplete(
   const payload: Record<string, unknown> = {
     model,
     messages: buildMessages(req),
-    plugins: [{ id: "web" }],
     stream: false,
   };
+
+  if (req.plugins?.length) {
+    payload.plugins = req.plugins.map((id) => ({ id }));
+  }
 
   if (req.tools?.length) {
     payload.tools = req.tools;
@@ -92,9 +95,12 @@ async function handleStream(
   const payload: Record<string, unknown> = {
     model,
     messages: buildMessages(req),
-    plugins: [{ id: "web" }],
     stream: true,
   };
+
+  if (req.plugins?.length) {
+    payload.plugins = req.plugins.map((id) => ({ id }));
+  }
 
   if (req.tools?.length) {
     payload.tools = req.tools;

@@ -1,0 +1,7 @@
+id: scout
+name: Scout
+description: Web research specialist — searches the web, synthesizes findings, and returns structured research briefs
+model: anthropic/claude-sonnet-4.6
+skills:
+  - web_search
+  - drive

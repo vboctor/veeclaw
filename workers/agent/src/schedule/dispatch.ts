@@ -1,7 +1,5 @@
 import type {
   CompletionRequest,
-  CompletionResponse,
-  Message,
   ScheduleEntry,
   PromptScheduleEntry,
   ActionScheduleEntry,
@@ -11,21 +9,24 @@ import { loadMemory, loadMemoryData, injectMemory } from "../memory/load.ts";
 import { saveMemoryData } from "../memory/store.ts";
 import { appendToWorkingMemory } from "../memory/update.ts";
 import { extractFacts } from "../memory/extract.ts";
+import { getOrchestrator } from "../agents/loader.ts";
+import { resolveSkills } from "../skills/registry.ts";
+import { runAgent } from "../agents/runner.ts";
 import {
-  extractScheduleCommands,
-  processScheduleCommands,
-} from "./extract.ts";
-import { GOOGLE_TOOLS } from "../tools/google.ts";
-import { executeToolCalls } from "../tools/execute.ts";
-import SYSTEM_PROMPT from "../prompts/system.md";
+  handleDelegation,
+  DELEGATE_TOOL,
+} from "../tools/delegate.ts";
 
 const TELEGRAM_API = "https://api.telegram.org";
 
-function applySystemPrompt(req: CompletionRequest): CompletionRequest {
+function applySystemPrompt(
+  req: CompletionRequest,
+  prompt: string
+): CompletionRequest {
   const now = new Date();
   const timeContext = `Current datetime: ${now.toISOString()} (${now.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })} ${now.toLocaleTimeString("en-US", { hour12: true })})`;
 
-  const base = `${SYSTEM_PROMPT}\n\n${timeContext}`;
+  const base = `${prompt}\n\n${timeContext}`;
   const system = req.system ? `${base}\n\n---\n\n${req.system}` : base;
   return { ...req, system };
 }
@@ -91,89 +92,65 @@ export async function dispatchScheduleEntry(
   }
 }
 
-const MAX_TOOL_ROUNDS = 5;
-
-async function callLLMGateway(
-  env: Env,
-  req: CompletionRequest,
-): Promise<CompletionResponse> {
-  const response = await env.LLM_GATEWAY.fetch(
-    "https://internal/v1/complete",
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(req),
-    }
-  );
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`LLM gateway error: ${text}`);
-  }
-
-  return (await response.json()) as CompletionResponse;
-}
-
 async function dispatchPrompt(
   entry: PromptScheduleEntry,
   env: Env,
   ctx?: ExecutionContext
 ): Promise<void> {
+  const orchestrator = getOrchestrator();
+  const { tools: skillTools, routes, plugins, prompts } = resolveSkills(
+    orchestrator.skills
+  );
+
+  let prompt = orchestrator.prompt;
+  if (prompts.length > 0) {
+    prompt += `\n\n${prompts.join("\n\n")}`;
+  }
+
   const req: CompletionRequest = {
     system: `This is a scheduled task execution. After completing any actions (sending emails, creating events, etc.), always provide a brief confirmation of what was done. For example: "Sent email about <topic> to <address>" or "Created calendar event <title> for <date>".`,
     messages: [{ role: "user", content: entry.event.content }],
-    tools: GOOGLE_TOOLS,
+    tools: [...skillTools, DELEGATE_TOOL],
+    model: orchestrator.model,
+    plugins: plugins.length > 0 ? plugins : undefined,
   };
 
-  const withPrompt = applySystemPrompt(req);
+  const withPrompt = applySystemPrompt(req, prompt);
   const memory = await loadMemory(env.AGENT_KV);
   const enriched = injectMemory(withPrompt, memory);
 
-  // Tool execution loop
-  let currentReq = enriched;
-  let data: CompletionResponse;
+  const data = await runAgent({
+    request: enriched,
+    env,
+    routes,
+    onDelegateCall: (agentId, task, instructions) =>
+      handleDelegation(agentId, task, instructions, env),
+  });
 
-  for (let round = 0; round < MAX_TOOL_ROUNDS; round++) {
-    data = await callLLMGateway(env, currentReq);
+  const content = data.content;
 
-    if (!data.tool_calls?.length) break;
-
-    const toolResults = await executeToolCalls(data.tool_calls, env.GOOGLE_CONNECTOR);
-
-    const assistantMsg: Message = {
-      role: "assistant",
-      content: data.content || "",
-      tool_calls: data.tool_calls,
-    };
-
-    currentReq = {
-      ...currentReq,
-      messages: [...currentReq.messages, assistantMsg, ...toolResults],
-    };
-  }
-
-  const rawResponse = data!.content;
-  const { cleanContent, commands } = extractScheduleCommands(rawResponse);
-
-  if (commands.length > 0) {
-    const task = processScheduleCommands(env.AGENT_KV, commands).catch(
-      () => {}
-    );
-    ctx ? ctx.waitUntil(task) : await task;
-  }
-
-  if (cleanContent && env.DEFAULT_CHAT_ID) {
+  if (content && env.DEFAULT_CHAT_ID) {
     await sendTelegram(
       env.TELEGRAM_BOT_TOKEN,
       env.DEFAULT_CHAT_ID,
-      `📋 **${entry.label}**\n\n${cleanContent}`
+      `📋 **${entry.label}**\n\n${content}`
     );
   }
 
   const memoryTask = (async () => {
     let data = await loadMemoryData(env.AGENT_KV);
-    data = await appendToWorkingMemory(data, env.LLM_GATEWAY, entry.event.content, cleanContent);
-    data = await extractFacts(data, env.LLM_GATEWAY, entry.event.content, cleanContent);
+    data = await appendToWorkingMemory(
+      data,
+      env.LLM_GATEWAY,
+      entry.event.content,
+      content
+    );
+    data = await extractFacts(
+      data,
+      env.LLM_GATEWAY,
+      entry.event.content,
+      content
+    );
     await saveMemoryData(env.AGENT_KV, data);
   })().catch(() => {});
   ctx ? ctx.waitUntil(memoryTask) : await memoryTask;
@@ -191,7 +168,6 @@ async function dispatchAction(
       if (chatId) {
         await sendTelegram(env.TELEGRAM_BOT_TOKEN, chatId, action.text);
       }
-      // send_message actions are themselves user-visible — no extra confirmation needed
       break;
     }
 
@@ -211,7 +187,11 @@ async function dispatchAction(
         if (action.expect_status && res.status !== action.expect_status) {
           const msg = `⚠️ **${entry.label}** — HTTP ${res.status} (expected ${action.expect_status})`;
           if (env.DEFAULT_CHAT_ID) {
-            await sendTelegram(env.TELEGRAM_BOT_TOKEN, env.DEFAULT_CHAT_ID, msg);
+            await sendTelegram(
+              env.TELEGRAM_BOT_TOKEN,
+              env.DEFAULT_CHAT_ID,
+              msg
+            );
           }
         } else if (env.DEFAULT_CHAT_ID) {
           await sendTelegram(
