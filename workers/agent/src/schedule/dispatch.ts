@@ -67,10 +67,9 @@ async function sendTelegram(
       body: JSON.stringify({
         chat_id: chatId,
         text: chunk,
-        parse_mode: "MarkdownV2",
+        parse_mode: "HTML",
       }),
     });
-    // Fallback to plain text if MarkdownV2 parsing fails
     if (!res.ok) {
       await fetch(`${TELEGRAM_API}/bot${botToken}/sendMessage`, {
         method: "POST",

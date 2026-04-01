@@ -72,7 +72,7 @@ async function main() {
 
   console.log("  This will delete:");
   console.log("    - Telegram webhook");
-  console.log("    - All 5 Cloudflare Workers");
+  console.log("    - All 6 Cloudflare Workers");
   console.log("    - KV namespaces (AGENT_KV, TOOL_CACHE)");
   console.log("    - Local .dev.vars files");
   console.log("  ");
@@ -110,6 +110,7 @@ async function main() {
   const workers = [
     "veeclaw-telegram-gateway",
     "veeclaw-agent",
+    "veeclaw-mantishub-connector",
     "veeclaw-github-connector",
     "veeclaw-google-connector",
     "veeclaw-llm-gateway",
@@ -170,6 +171,27 @@ async function main() {
     }
   }
 
+  // Delete CONNECTOR_KV (MantisHub Connector)
+  const mantishubWranglerPath = join(ROOT, "workers/connectors/mantishub/wrangler.jsonc");
+  if (existsSync(mantishubWranglerPath)) {
+    const mantishubWranglerContent = readFileSync(mantishubWranglerPath, "utf-8");
+    const mantishubIdMatch = mantishubWranglerContent.match(/"binding":\s*"CONNECTOR_KV",\s*"id":\s*"([^"]*)"/);
+    const mantishubKvId = mantishubIdMatch?.[1];
+
+    if (mantishubKvId) {
+      const result = await run(["bun", "x", "wrangler", "kv", "namespace", "delete", "--namespace-id", mantishubKvId]);
+      if (result.ok) {
+        log("DELETE", `KV namespace CONNECTOR_KV (${mantishubKvId})`);
+      } else if (result.stderr.includes("not found") || result.stdout.includes("not found")) {
+        log("SKIP", `KV namespace ${mantishubKvId} (not found)`);
+      } else {
+        log("WARN", `Failed to delete CONNECTOR_KV namespace: ${result.stderr || result.stdout}`);
+      }
+    } else {
+      log("SKIP", "No CONNECTOR_KV namespace ID found in mantishub connector wrangler.jsonc");
+    }
+  }
+
   // ── Step 4: Clean local .dev.vars files ──────────────────────────────────
 
   header("Local Files");
@@ -178,6 +200,7 @@ async function main() {
     "workers/llm-gateway/.dev.vars",
     "workers/connectors/google/.dev.vars",
     "workers/connectors/github/.dev.vars",
+    "workers/connectors/mantishub/.dev.vars",
     "workers/agent/.dev.vars",
     "workers/telegram-gateway/.dev.vars",
   ];

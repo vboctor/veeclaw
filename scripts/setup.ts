@@ -102,6 +102,7 @@ const OPTIONAL_SECRETS = ["DEFAULT_CHAT_ID", "ALLOWED_CHAT_IDS"] as const;
 const AUTO_GENERATE = ["TELEGRAM_WEBHOOK_SECRET", "AGENT_TOKEN"] as const;
 const GOOGLE_SECRETS = ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_REFRESH_TOKEN"] as const;
 const GITHUB_SECRETS = ["GITHUB_TOKEN"] as const;
+const MANTISHUB_SECRETS = ["MANTISHUB_INSTANCES"] as const;
 
 const WORKER_SECRETS: Record<string, { required: string[]; optional: string[] }> = {
   "veeclaw-llm-gateway": {
@@ -114,6 +115,10 @@ const WORKER_SECRETS: Record<string, { required: string[]; optional: string[] }>
   },
   "veeclaw-github-connector": {
     required: ["GITHUB_TOKEN"],
+    optional: [],
+  },
+  "veeclaw-mantishub-connector": {
+    required: [],
     optional: [],
   },
   "veeclaw-agent": {
@@ -130,6 +135,7 @@ const DEV_VARS: Record<string, string[]> = {
   "workers/llm-gateway": ["OPENROUTER_API_KEY"],
   "workers/connectors/google": ["GOOGLE_CLIENT_ID", "GOOGLE_CLIENT_SECRET", "GOOGLE_REFRESH_TOKEN"],
   "workers/connectors/github": ["GITHUB_TOKEN"],
+  "workers/connectors/mantishub": [],
   "workers/agent": ["TELEGRAM_BOT_TOKEN", "AGENT_TOKEN", "DEFAULT_CHAT_ID"],
   "workers/telegram-gateway": ["TELEGRAM_BOT_TOKEN", "TELEGRAM_WEBHOOK_SECRET", "AGENT_TOKEN", "ALLOWED_CHAT_IDS"],
 };
@@ -242,6 +248,18 @@ async function collectSecrets(): Promise<Record<string, string>> {
 
     if (!vars[key]) {
       log("INFO", `${key} not set — run 'bun run github-auth' to set up GitHub access`);
+    }
+  }
+
+  // MantisHub Connector secrets
+  for (const key of MANTISHUB_SECRETS) {
+    if (vars[key] && !FORCE) {
+      log("SKIP", `${key} (already set)`);
+      continue;
+    }
+
+    if (!vars[key]) {
+      log("INFO", `${key} not set — run 'bun run mantishub-auth' to add MantisHub instances`);
     }
   }
 
@@ -394,6 +412,140 @@ async function ensureGoogleKVNamespace(): Promise<string | null> {
   return newId;
 }
 
+// ── Step 3c: MantisHub Connector KV namespace ─────────────────────────────────
+
+async function ensureMantisHubKVNamespace(): Promise<string | null> {
+  header("MantisHub Connector KV Namespace");
+
+  const wranglerPath = join(ROOT, "workers/connectors/mantishub/wrangler.jsonc");
+  const wranglerContent = readFileSync(wranglerPath, "utf-8");
+  const idMatch = wranglerContent.match(/"binding":\s*"CONNECTOR_KV",\s*"id":\s*"([^"]*)"/);
+  const currentId = idMatch?.[1] ?? "";
+
+  if (currentId && !FORCE) {
+    // Verify it exists
+    const list = await run(["bun", "x", "wrangler", "kv", "namespace", "list"]);
+    if (list.ok) {
+      try {
+        const namespaces = JSON.parse(list.stdout) as Array<{ id: string; title: string }>;
+        const existing = namespaces.find((ns) => ns.id === currentId);
+        if (existing) {
+          log("SKIP", `KV namespace exists: ${existing.title} (${existing.id})`);
+          return existing.id;
+        }
+      } catch { /* empty */ }
+    }
+  }
+
+  const list = await run(["bun", "x", "wrangler", "kv", "namespace", "list"]);
+  if (!list.ok) {
+    log("WARN", `Failed to list KV namespaces: ${list.stderr}`);
+    return null;
+  }
+
+  let namespaces: Array<{ id: string; title: string }> = [];
+  try {
+    namespaces = JSON.parse(list.stdout);
+  } catch {
+    log("WARN", "Failed to parse KV namespace list");
+    return null;
+  }
+
+  const byTitle = namespaces.find((ns) => ns.title === "veeclaw-mantishub-connector-kv");
+  if (byTitle && !FORCE) {
+    log("OK", `Found existing KV namespace: ${byTitle.title} (${byTitle.id})`);
+    if (byTitle.id !== currentId) {
+      const updated = wranglerContent.replace(
+        /("binding":\s*"CONNECTOR_KV",\s*"id":\s*")[^"]*/,
+        `$1${byTitle.id}`,
+      );
+      writeFileSync(wranglerPath, updated);
+      log("UPDATE", `wrangler.jsonc updated with KV ID: ${byTitle.id}`);
+    }
+    return byTitle.id;
+  }
+
+  // Create from root to avoid wrangler.jsonc validation errors on empty id
+  const create = await run(["bun", "x", "wrangler", "kv", "namespace", "create", "veeclaw-mantishub-connector-kv"]);
+  if (!create.ok) {
+    log("WARN", `Failed to create KV namespace: ${create.stderr}`);
+    return null;
+  }
+
+  const newIdMatch = create.stdout.match(/"id":\s*"([^"]+)"/);
+  if (!newIdMatch) {
+    log("WARN", `Could not parse KV namespace ID from output:\n${create.stdout}`);
+    return null;
+  }
+
+  const newId = newIdMatch[1];
+  const updated = wranglerContent.replace(
+    /("binding":\s*"CONNECTOR_KV",\s*"id":\s*")[^"]*/,
+    `$1${newId}`,
+  );
+  writeFileSync(wranglerPath, updated);
+  log("CREATE", `KV namespace created (${newId}) and wrangler.jsonc updated`);
+  return newId;
+}
+
+// ── Step 3d: Push MantisHub instances to KV ───────────────────────────────────
+
+async function pushMantisHubInstances(vars: Record<string, string>, kvId: string | null) {
+  header("MantisHub Instances");
+
+  if (!kvId) {
+    log("SKIP", "No KV namespace — skipping instance push");
+    return;
+  }
+
+  const raw = vars.MANTISHUB_INSTANCES;
+  if (!raw) {
+    log("INFO", "No MANTISHUB_INSTANCES in .env — run 'bun run mantishub-auth' to add instances");
+    return;
+  }
+
+  let instances: Array<{ name: string; subdomain: string; baseUrl: string; token: string; default?: boolean }>;
+  try {
+    instances = JSON.parse(raw);
+  } catch {
+    log("WARN", "Failed to parse MANTISHUB_INSTANCES from .env");
+    return;
+  }
+
+  if (instances.length === 0) {
+    log("SKIP", "No instances configured");
+    return;
+  }
+
+  // Write each instance config to KV
+  for (const inst of instances) {
+    const value = JSON.stringify(inst);
+    const result = await run([
+      "bun", "x", "wrangler", "kv", "key", "put",
+      `instance:${inst.name}`, value,
+      "--namespace-id", kvId, "--remote",
+    ]);
+    if (result.ok) {
+      log("CREATE", `KV instance:${inst.name} → ${inst.baseUrl}${inst.default ? " (default)" : ""}`);
+    } else {
+      log("WARN", `Failed to write instance:${inst.name}: ${result.stderr}`);
+    }
+  }
+
+  // Write the index
+  const index = JSON.stringify(instances.map((i) => i.name));
+  const indexResult = await run([
+    "bun", "x", "wrangler", "kv", "key", "put",
+    "instances:index", index,
+    "--namespace-id", kvId, "--remote",
+  ]);
+  if (indexResult.ok) {
+    log("CREATE", `KV instances:index → ${index}`);
+  } else {
+    log("WARN", `Failed to write instances:index: ${indexResult.stderr}`);
+  }
+}
+
 // ── Step 4: Generate .dev.vars ───────────────────────────────────────────────
 
 function generateDevVars(vars: Record<string, string>) {
@@ -419,6 +571,7 @@ async function deployWorkers(): Promise<{ telegramUrl?: string }> {
     { name: "veeclaw-llm-gateway", dir: "workers/llm-gateway" },
     { name: "veeclaw-google-connector", dir: "workers/connectors/google" },
     { name: "veeclaw-github-connector", dir: "workers/connectors/github" },
+    { name: "veeclaw-mantishub-connector", dir: "workers/connectors/mantishub" },
     { name: "veeclaw-agent", dir: "workers/agent" },
     { name: "veeclaw-telegram-gateway", dir: "workers/telegram-gateway" },
   ];
@@ -548,9 +701,11 @@ async function main() {
   const vars = await collectSecrets();
   await ensureKVNamespace();
   await ensureGoogleKVNamespace();
+  const mantishubKvId = await ensureMantisHubKVNamespace();
   generateDevVars(vars);
   const { telegramUrl } = await deployWorkers();
   await pushSecrets(vars);
+  await pushMantisHubInstances(vars, mantishubKvId);
   await registerWebhook(vars, telegramUrl);
 
   header("Done");

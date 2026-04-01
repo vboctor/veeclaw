@@ -1,17 +1,21 @@
 /**
- * Convert standard Markdown (from LLM output) to Telegram MarkdownV2.
+ * Convert standard Markdown (from LLM output) to Telegram HTML.
  *
- * Telegram MarkdownV2 requires escaping special characters outside of
- * code blocks/inline code, and doesn't support headers or horizontal rules.
+ * Telegram HTML reliably renders links, bold, italic, and code blocks.
+ * Supported tags: <b>, <i>, <code>, <pre>, <a>.
  */
 
-// Characters that must be escaped in MarkdownV2 (outside code blocks)
-const ESCAPE_CHARS = /([_~|{}.!>\-\\#+=\[\]()])/g;
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
 
 /**
- * Escape a string for Telegram MarkdownV2, preserving bold/italic/link markup.
+ * Convert inline markdown formatting to Telegram HTML.
  */
-function escapeSegment(text: string): string {
+function convertInline(text: string): string {
   const parts: string[] = [];
   let remaining = text;
 
@@ -23,7 +27,11 @@ function escapeSegment(text: string): string {
       { regex: /\[([^\]]+)\]\(([^)]+)\)/, type: "link" },
     ];
 
-    let earliest: { index: number; match: RegExpExecArray; type: string } | null = null;
+    let earliest: {
+      index: number;
+      match: RegExpExecArray;
+      type: string;
+    } | null = null;
 
     for (const p of patterns) {
       const m = p.regex.exec(remaining);
@@ -33,29 +41,30 @@ function escapeSegment(text: string): string {
     }
 
     if (!earliest) {
-      parts.push(remaining.replace(ESCAPE_CHARS, "\\$1"));
+      parts.push(escapeHtml(remaining));
       break;
     }
 
     if (earliest.index > 0) {
-      parts.push(remaining.slice(0, earliest.index).replace(ESCAPE_CHARS, "\\$1"));
+      parts.push(escapeHtml(remaining.slice(0, earliest.index)));
     }
 
     const m = earliest.match;
 
     switch (earliest.type) {
       case "bold":
-        parts.push(`*${m[1].replace(ESCAPE_CHARS, "\\$1")}*`);
+        parts.push(`<b>${convertInline(m[1])}</b>`);
         break;
       case "italic":
-        parts.push(`_${m[1].replace(ESCAPE_CHARS, "\\$1")}_`);
+        parts.push(`<i>${convertInline(m[1])}</i>`);
         break;
       case "code":
-        parts.push(`\`${m[1].replace(/\\/g, "\\\\").replace(/`/g, "\\`")}\``);
+        parts.push(`<code>${escapeHtml(m[1])}</code>`);
         break;
       case "link":
+        // Recursively convert inline formatting inside link text (e.g., **#1144**)
         parts.push(
-          `[${m[1].replace(ESCAPE_CHARS, "\\$1")}](${m[2].replace(/[)\\]/g, "\\$&")})`
+          `<a href="${m[2].replace(/&/g, "&amp;").replace(/"/g, "&quot;")}">${convertInline(m[1])}</a>`,
         );
         break;
     }
@@ -81,8 +90,12 @@ export function toTelegramMarkdown(text: string): string {
         codeBlockLines.length = 0;
         continue;
       } else {
-        const lang = codeBlockLang ? `${codeBlockLang}\n` : "";
-        result.push(`\`\`\`${lang}${codeBlockLines.join("\n")}\`\`\``);
+        const langAttr = codeBlockLang
+          ? ` class="language-${escapeHtml(codeBlockLang)}"`
+          : "";
+        result.push(
+          `<pre><code${langAttr}>${escapeHtml(codeBlockLines.join("\n"))}</code></pre>`,
+        );
         inCodeBlock = false;
         continue;
       }
@@ -99,39 +112,25 @@ export function toTelegramMarkdown(text: string): string {
       continue;
     }
 
-    // Headers — convert to bold text
+    // Headers — convert to bold
     const headerMatch = line.match(/^(#{1,6})\s+(.+)/);
     if (headerMatch) {
-      result.push(`*${headerMatch[2].replace(ESCAPE_CHARS, "\\$1")}*`);
+      result.push(`<b>${convertInline(headerMatch[2])}</b>`);
       continue;
     }
 
-    // Bullet points
-    const bulletMatch = line.match(/^(\s*[-*•])\s+(.*)/);
-    if (bulletMatch) {
-      const indent = bulletMatch[1].replace(/[-*•]/g, (ch) =>
-        ch === "-" ? "\\-" : ch === "*" ? "\\*" : ch
-      );
-      result.push(`${indent} ${escapeSegment(bulletMatch[2])}`);
-      continue;
-    }
-
-    // Numbered list items
-    const numberedMatch = line.match(/^(\s*\d+[.)]) (.*)/);
-    if (numberedMatch) {
-      const prefix = numberedMatch[1].replace(ESCAPE_CHARS, "\\$1");
-      result.push(`${prefix} ${escapeSegment(numberedMatch[2])}`);
-      continue;
-    }
-
-    // Regular line
-    result.push(escapeSegment(line));
+    // All other lines get inline conversion
+    result.push(convertInline(line));
   }
 
   // Handle unclosed code block
   if (inCodeBlock) {
-    const lang = codeBlockLang ? `${codeBlockLang}\n` : "";
-    result.push(`\`\`\`${lang}${codeBlockLines.join("\n")}\`\`\``);
+    const langAttr = codeBlockLang
+      ? ` class="language-${escapeHtml(codeBlockLang)}"`
+      : "";
+    result.push(
+      `<pre><code${langAttr}>${escapeHtml(codeBlockLines.join("\n"))}</code></pre>`,
+    );
   }
 
   return result.join("\n");

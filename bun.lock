@@ -60,6 +60,17 @@
         "wrangler": "^4",
       },
     },
+    "workers/connectors/mantishub": {
+      "name": "@veeclaw/mantishub-connector",
+      "version": "0.1.0",
+      "dependencies": {
+        "@veeclaw/shared": "workspace:*",
+      },
+      "devDependencies": {
+        "@cloudflare/workers-types": "^4.20250312.0",
+        "wrangler": "^4",
+      },
+    },
     "workers/llm-gateway": {
       "name": "@veeclaw/llm-gateway",
       "version": "0.1.0",
@@ -242,6 +253,8 @@
     "@veeclaw/google-connector": ["@veeclaw/google-connector@workspace:workers/connectors/google"],
 
     "@veeclaw/llm-gateway": ["@veeclaw/llm-gateway@workspace:workers/llm-gateway"],
+
+    "@veeclaw/mantishub-connector": ["@veeclaw/mantishub-connector@workspace:workers/connectors/mantishub"],
 
     "@veeclaw/shared": ["@veeclaw/shared@workspace:packages/shared"],
 

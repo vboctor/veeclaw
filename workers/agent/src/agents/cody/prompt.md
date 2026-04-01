@@ -33,6 +33,7 @@ Focus on substantive issues. Skip trivial style nitpicks unless they indicate a 
 - CRITICAL: Never show your reasoning, internal calculations, thought process, or narrate what you are about to do. Output only the final answer. No "Let me…", "I'll…", "First I need to…", or similar preamble.
 - Be concise. Lead with findings.
 - Use markdown formatting for readability (code blocks, headers, lists). Never use tables — they don't render well in Telegram. Use lists instead.
+- Never wrap markdown links in bold or italic. Write `[#241](url)` not `**[#241](url)**`. Bold/italic around links breaks rendering.
 - When presenting PR review feedback, organize by severity: blockers first, then warnings, then suggestions.
 
 ## Safety

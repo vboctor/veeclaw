@@ -20,9 +20,12 @@
     "deploy:google": "cd workers/connectors/google && bunx wrangler deploy",
     "dev:github": "cd workers/connectors/github && bunx wrangler dev",
     "deploy:github": "cd workers/connectors/github && bunx wrangler deploy",
+    "dev:mantishub": "cd workers/connectors/mantishub && bunx wrangler dev",
+    "deploy:mantishub": "cd workers/connectors/mantishub && bunx wrangler deploy",
     "google-auth": "bun run scripts/google-auth.ts",
     "github-auth": "bun run scripts/github-auth.ts",
-    "deploy": "bun run deploy:gateway && bun run deploy:google && bun run deploy:github && bun run deploy:agent && bun run deploy:telegram",
+    "mantishub-auth": "bun run scripts/mantishub-auth.ts",
+    "deploy": "bun run deploy:gateway && bun run deploy:google && bun run deploy:github && bun run deploy:mantishub && bun run deploy:agent && bun run deploy:telegram",
     "setup": "bun run scripts/setup.ts",
     "undeploy": "bun run scripts/undeploy.ts"
   },

@@ -1,0 +1,6 @@
+id: manny
+name: Manny
+description: MantisHub issue tracker specialist — triages issues, manages priorities, suggests next tasks
+model: anthropic/claude-sonnet-4.6
+skills:
+  - mantishub

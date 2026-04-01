@@ -34,6 +34,7 @@ export interface Env {
   LLM_GATEWAY: Fetcher;
   GOOGLE_CONNECTOR: Fetcher;
   GITHUB_CONNECTOR: Fetcher;
+  MANTISHUB_CONNECTOR: Fetcher;
   TELEGRAM_BOT_TOKEN: string;
   DEFAULT_CHAT_ID: string;
 }

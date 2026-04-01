@@ -51,9 +51,9 @@ async function sendReply(
   const converted = toTelegramMarkdown(text);
   const chunks = chunkText(converted);
   for (const chunk of chunks) {
-    const sent = await sendTelegram(botToken, chatId, chunk, "MarkdownV2");
+    const sent = await sendTelegram(botToken, chatId, chunk, "HTML");
     if (!sent) {
-      // Fallback: send as plain text if MarkdownV2 parsing fails
+      // Fallback: send as plain text
       await sendTelegram(botToken, chatId, chunk);
     }
   }

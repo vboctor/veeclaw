@@ -73,6 +73,7 @@ export async function runAgent(
     const connectors: Record<string, Fetcher> = {};
     if (env.GOOGLE_CONNECTOR) connectors.GOOGLE_CONNECTOR = env.GOOGLE_CONNECTOR;
     if (env.GITHUB_CONNECTOR) connectors.GITHUB_CONNECTOR = env.GITHUB_CONNECTOR;
+    if (env.MANTISHUB_CONNECTOR) connectors.MANTISHUB_CONNECTOR = env.MANTISHUB_CONNECTOR;
 
     const connectorResults =
       connectorCalls.length > 0

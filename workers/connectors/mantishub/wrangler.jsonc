@@ -1,0 +1,11 @@
+{
+  "name": "veeclaw-mantishub-connector",
+  "main": "src/index.ts",
+  "compatibility_date": "2025-03-27",
+  "compatibility_flags": ["nodejs_compat"],
+
+  // KV for storing instance configs (subdomain + token per instance)
+  "kv_namespaces": [
+    { "binding": "CONNECTOR_KV", "id": "3d8532d1ef314987a529b0c296069d11" }
+  ]
+}

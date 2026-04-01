@@ -12,6 +12,10 @@ import {
   GITHUB_TOOLS,
   GITHUB_TOOL_ROUTES,
 } from "../tools/github.ts";
+import {
+  MANTISHUB_TOOLS,
+  MANTISHUB_TOOL_ROUTES,
+} from "../tools/mantishub.ts";
 import { SCHEDULE_TOOLS } from "../tools/schedule.ts";
 
 import GMAIL_SKILL_MD from "./gmail/SKILL.md";
@@ -20,6 +24,7 @@ import DRIVE_SKILL_MD from "./drive/SKILL.md";
 import WEB_SEARCH_SKILL_MD from "./web_search/SKILL.md";
 import CRON_SKILL_MD from "./cron/SKILL.md";
 import GITHUB_SKILL_MD from "./github/SKILL.md";
+import MANTISHUB_SKILL_MD from "./mantishub/SKILL.md";
 
 export interface SkillConfig {
   id: string;
@@ -64,6 +69,7 @@ const driveSkill = parseSkillMd(DRIVE_SKILL_MD);
 const webSearchSkill = parseSkillMd(WEB_SEARCH_SKILL_MD);
 const cronSkill = parseSkillMd(CRON_SKILL_MD);
 const githubSkill = parseSkillMd(GITHUB_SKILL_MD);
+const mantishubSkill = parseSkillMd(MANTISHUB_SKILL_MD);
 
 const SKILLS: Record<string, SkillConfig> = {
   gmail: {
@@ -125,6 +131,15 @@ const SKILLS: Record<string, SkillConfig> = {
     tools: GITHUB_TOOLS,
     routes: GITHUB_TOOL_ROUTES,
     connector: "GITHUB_CONNECTOR",
+  },
+  mantishub: {
+    id: "mantishub",
+    name: mantishubSkill.name,
+    description: mantishubSkill.description,
+    prompt: mantishubSkill.prompt,
+    tools: MANTISHUB_TOOLS,
+    routes: MANTISHUB_TOOL_ROUTES,
+    connector: "MANTISHUB_CONNECTOR",
   },
 };
 
