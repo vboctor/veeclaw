@@ -15,6 +15,7 @@ import { runAgent } from "../agents/runner.ts";
 import {
   handleDelegation,
   DELEGATE_TOOL,
+  buildAgentListing,
 } from "../tools/delegate.ts";
 
 const TELEGRAM_API = "https://api.telegram.org";
@@ -26,7 +27,8 @@ function applySystemPrompt(
   const now = new Date();
   const timeContext = `Current datetime: ${now.toISOString()} (${now.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })} ${now.toLocaleTimeString("en-US", { hour12: true })})`;
 
-  const base = `${prompt}\n\n${timeContext}`;
+  const agentListing = buildAgentListing();
+  const base = `${prompt}\n\n${agentListing}\n\n${timeContext}`;
   const system = req.system ? `${base}\n\n---\n\n${req.system}` : base;
   return { ...req, system };
 }
