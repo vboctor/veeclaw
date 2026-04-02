@@ -271,6 +271,28 @@ async function handleStream(
   });
 }
 
+// ── Memory routes ────────────────────────────────────────────────
+
+async function handleMemoryRoutes(
+  request: Request,
+  env: Env
+): Promise<Response> {
+  const kv = env.AGENT_KV;
+
+  if (request.method === "GET") {
+    const data = await loadMemoryData(kv);
+    return Response.json(data);
+  }
+
+  if (request.method === "PUT") {
+    const data = (await request.json()) as Parameters<typeof saveMemoryData>[1];
+    await saveMemoryData(kv, data);
+    return new Response(null, { status: 204 });
+  }
+
+  return new Response("Method not allowed", { status: 405 });
+}
+
 // ── Schedule CRUD routes ──────────────────────────────────────────
 
 async function handleScheduleRoutes(
@@ -356,6 +378,11 @@ export default {
     }
 
     const url = new URL(request.url);
+
+    // Memory routes
+    if (url.pathname === "/v1/memory") {
+      return handleMemoryRoutes(request, env);
+    }
 
     // Schedule CRUD routes
     if (url.pathname.startsWith("/v1/schedules")) {

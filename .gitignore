@@ -36,6 +36,9 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 # Claude Code local settings
 .claude/CLAUDE.local.md
 
+# Agent state (pulled via `bun run pull`)
+state
+
 # Wrangler
 .wrangler
 .dev.vars

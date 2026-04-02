@@ -29,6 +29,8 @@
     "mantishub-auth": "bun run scripts/mantishub-auth.ts",
     "todoist-auth": "bun run scripts/todoist-auth.ts",
     "deploy": "bun run deploy:gateway && bun run deploy:google && bun run deploy:github && bun run deploy:mantishub && bun run deploy:todoist && bun run deploy:agent && bun run deploy:telegram",
+    "pull": "bun run scripts/state-pull.ts",
+    "push": "bun run scripts/state-push.ts",
     "setup": "bun run scripts/setup.ts",
     "undeploy": "bun run scripts/undeploy.ts"
   },
