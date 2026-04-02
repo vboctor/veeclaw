@@ -12,10 +12,29 @@ interface Env {
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const DEFAULT_MODEL = "anthropic/claude-haiku-4.5";
 
-function buildMessages(req: CompletionRequest): Record<string, unknown>[] {
+function isAnthropicModel(model: string): boolean {
+  return model.includes("anthropic/") || model.includes("claude");
+}
+
+function buildMessages(
+  req: CompletionRequest,
+  cacheEnabled: boolean,
+): Record<string, unknown>[] {
   const msgs: Record<string, unknown>[] = [];
   if (req.system) {
-    msgs.push({ role: "system", content: req.system });
+    const systemMsg: Record<string, unknown> = {
+      role: "system",
+      content: cacheEnabled
+        ? [
+            {
+              type: "text",
+              text: req.system,
+              cache_control: { type: "ephemeral" },
+            },
+          ]
+        : req.system,
+    };
+    msgs.push(systemMsg);
   }
   for (const msg of req.messages) {
     const m: Record<string, unknown> = { role: msg.role, content: msg.content };
@@ -26,15 +45,33 @@ function buildMessages(req: CompletionRequest): Record<string, unknown>[] {
   return msgs;
 }
 
+/**
+ * Mark the last tool with cache_control so the full tool set is cached.
+ * Anthropic caches everything up to and including the cache breakpoint.
+ */
+function buildTools(
+  tools: unknown[],
+  cacheEnabled: boolean,
+): unknown[] {
+  if (!cacheEnabled || tools.length === 0) return tools;
+
+  const result = [...tools];
+  const last = { ...(result[result.length - 1] as Record<string, unknown>) };
+  last.cache_control = { type: "ephemeral" };
+  result[result.length - 1] = last;
+  return result;
+}
+
 async function handleComplete(
   req: CompletionRequest,
   env: Env
 ): Promise<Response> {
   const model = req.model ?? DEFAULT_MODEL;
+  const cacheEnabled = isAnthropicModel(model);
 
   const payload: Record<string, unknown> = {
     model,
-    messages: buildMessages(req),
+    messages: buildMessages(req, cacheEnabled),
     stream: false,
   };
 
@@ -43,7 +80,7 @@ async function handleComplete(
   }
 
   if (req.tools?.length) {
-    payload.tools = req.tools;
+    payload.tools = buildTools(req.tools, cacheEnabled);
   }
 
   const response = await fetch(OPENROUTER_URL, {
@@ -65,7 +102,12 @@ async function handleComplete(
   const data = (await response.json()) as {
     choices?: { message?: { content?: string; tool_calls?: ToolCall[] } }[];
     model?: string;
-    usage?: { prompt_tokens: number; completion_tokens: number };
+    usage?: {
+      prompt_tokens: number;
+      completion_tokens: number;
+      cache_creation_input_tokens?: number;
+      cache_read_input_tokens?: number;
+    };
   };
   const choice = data.choices?.[0];
   const content = choice?.message?.content ?? "";
@@ -79,6 +121,8 @@ async function handleComplete(
       ? {
           prompt_tokens: data.usage.prompt_tokens,
           completion_tokens: data.usage.completion_tokens,
+          cache_creation_input_tokens: data.usage.cache_creation_input_tokens,
+          cache_read_input_tokens: data.usage.cache_read_input_tokens,
         }
       : undefined,
   };
@@ -91,10 +135,11 @@ async function handleStream(
   env: Env
 ): Promise<Response> {
   const model = req.model ?? DEFAULT_MODEL;
+  const cacheEnabled = isAnthropicModel(model);
 
   const payload: Record<string, unknown> = {
     model,
-    messages: buildMessages(req),
+    messages: buildMessages(req, cacheEnabled),
     stream: true,
   };
 
@@ -103,7 +148,7 @@ async function handleStream(
   }
 
   if (req.tools?.length) {
-    payload.tools = req.tools;
+    payload.tools = buildTools(req.tools, cacheEnabled);
   }
 
   const response = await fetch(OPENROUTER_URL, {
