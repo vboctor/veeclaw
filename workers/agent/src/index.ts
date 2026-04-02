@@ -318,7 +318,7 @@ export default {
     env: Env,
     ctx: ExecutionContext
   ): Promise<void> {
-    ctx.waitUntil(runHeartbeat(env));
+    await runHeartbeat(env);
   },
 
   async fetch(
