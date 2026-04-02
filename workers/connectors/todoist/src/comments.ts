@@ -1,5 +1,13 @@
 import type { Env } from "./auth.ts";
-import { todoistJson } from "./todoist-fetch.ts";
+import { syncRead, syncWrite } from "./todoist-fetch.ts";
+
+interface SyncNote {
+  id: string;
+  item_id: string;
+  content: string;
+  posted_at: string;
+  is_deleted: boolean;
+}
 
 export async function handleCommentsList(
   env: Env,
@@ -7,21 +15,25 @@ export async function handleCommentsList(
 ): Promise<Response> {
   const body = (await request.json()) as {
     taskId?: string;
-    projectId?: string;
   };
 
-  const params = new URLSearchParams();
-  if (body.taskId) params.set("task_id", body.taskId);
-  if (body.projectId) params.set("project_id", body.projectId);
-
-  const queryStr = params.toString();
-  const { data, error } = await todoistJson<unknown[]>(
-    env,
-    `/comments${queryStr ? `?${queryStr}` : ""}`,
-  );
+  const { data, error } = await syncRead(env, ["notes"]);
   if (error) return error;
 
-  return Response.json({ comments: data });
+  let notes = ((data!.notes as SyncNote[]) || []).filter((n) => !n.is_deleted);
+
+  if (body.taskId) {
+    notes = notes.filter((n) => n.item_id === body.taskId);
+  }
+
+  return Response.json({
+    comments: notes.map((n) => ({
+      id: n.id,
+      taskId: n.item_id,
+      content: n.content,
+      postedAt: n.posted_at,
+    })),
+  });
 }
 
 export async function handleCommentsCreate(
@@ -30,29 +42,27 @@ export async function handleCommentsCreate(
 ): Promise<Response> {
   const body = (await request.json()) as {
     content: string;
-    taskId?: string;
-    projectId?: string;
+    taskId: string;
   };
 
-  if (!body.content) {
-    return Response.json({ error: "content is required" }, { status: 400 });
-  }
-  if (!body.taskId && !body.projectId) {
+  if (!body.content || !body.taskId) {
     return Response.json(
-      { error: "taskId or projectId is required" },
+      { error: "content and taskId are required" },
       { status: 400 },
     );
   }
 
-  const apiBody: Record<string, unknown> = { content: body.content };
-  if (body.taskId) apiBody.task_id = body.taskId;
-  if (body.projectId) apiBody.project_id = body.projectId;
-
-  const { data, error } = await todoistJson<unknown>(env, "/comments", {
-    method: "POST",
-    body: JSON.stringify(apiBody),
-  });
+  const tempId = crypto.randomUUID();
+  const { data, error } = await syncWrite(env, [
+    {
+      type: "note_add",
+      uuid: crypto.randomUUID(),
+      temp_id: tempId,
+      args: { item_id: body.taskId, content: body.content },
+    },
+  ]);
   if (error) return error;
 
-  return Response.json({ comment: data });
+  const realId = data!.temp_id_mapping[tempId] || tempId;
+  return Response.json({ comment: { id: realId, ok: true } });
 }

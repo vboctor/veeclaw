@@ -1,38 +1,28 @@
 import type { Env } from "./auth.ts";
 import { getToken } from "./auth.ts";
 
-const API_BASE = "https://api.todoist.com/api/v1";
+const SYNC_URL = "https://api.todoist.com/api/v1/sync";
 
 /**
- * Fetch wrapper for Todoist REST API.
+ * Perform a Sync API read request (fetch resources).
  */
-export async function todoistFetch(
+export async function syncRead(
   env: Env,
-  path: string,
-  init: RequestInit = {},
-): Promise<Response> {
+  resourceTypes: string[],
+): Promise<{ data?: Record<string, unknown>; error?: Response }> {
   const token = getToken(env);
-  const url = `${API_BASE}${path}`;
 
-  return fetch(url, {
-    ...init,
+  const res = await fetch(SYNC_URL, {
+    method: "POST",
     headers: {
-      ...init.headers,
       Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
+      "Content-Type": "application/x-www-form-urlencoded",
     },
+    body: new URLSearchParams({
+      sync_token: "*",
+      resource_types: JSON.stringify(resourceTypes),
+    }),
   });
-}
-
-/**
- * Helper: call Todoist API and return parsed JSON, or a structured error Response.
- */
-export async function todoistJson<T>(
-  env: Env,
-  path: string,
-  init: RequestInit = {},
-): Promise<{ data?: T; error?: Response }> {
-  const res = await todoistFetch(env, path, init);
 
   if (!res.ok) {
     const text = await res.text();
@@ -44,11 +34,70 @@ export async function todoistJson<T>(
     };
   }
 
-  // Some endpoints return 204 No Content
-  if (res.status === 204) {
-    return { data: {} as T };
+  const data = (await res.json()) as Record<string, unknown>;
+  return { data };
+}
+
+interface SyncCommand {
+  type: string;
+  uuid: string;
+  temp_id?: string;
+  args: Record<string, unknown>;
+}
+
+/**
+ * Execute one or more Sync API commands (write operations).
+ * Returns the sync_status and temp_id_mapping.
+ */
+export async function syncWrite(
+  env: Env,
+  commands: SyncCommand[],
+): Promise<{
+  data?: {
+    sync_status: Record<string, unknown>;
+    temp_id_mapping: Record<string, string>;
+  };
+  error?: Response;
+}> {
+  const token = getToken(env);
+
+  const res = await fetch(SYNC_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/x-www-form-urlencoded",
+    },
+    body: new URLSearchParams({
+      commands: JSON.stringify(commands),
+    }),
+  });
+
+  if (!res.ok) {
+    const text = await res.text();
+    return {
+      error: Response.json(
+        { error: text, status: res.status },
+        { status: res.status },
+      ),
+    };
   }
 
-  const data = (await res.json()) as T;
+  const data = (await res.json()) as {
+    sync_status: Record<string, unknown>;
+    temp_id_mapping: Record<string, string>;
+  };
+
+  // Check for command-level errors
+  for (const [uuid, status] of Object.entries(data.sync_status)) {
+    if (status !== "ok") {
+      return {
+        error: Response.json(
+          { error: `Command ${uuid} failed`, details: status },
+          { status: 400 },
+        ),
+      };
+    }
+  }
+
   return { data };
 }

@@ -1,23 +1,23 @@
 import type { Env } from "./auth.ts";
-import { todoistJson, todoistFetch } from "./todoist-fetch.ts";
+import { syncRead, syncWrite } from "./todoist-fetch.ts";
 
 /**
  * Convert user-facing priority (1=urgent, 2=high, 3=medium, 4=normal)
  * to Todoist API priority (1=normal, 4=urgent).
- * Todoist API is inverted from what users expect.
  */
 function toApiPriority(userPriority: number): number {
   return 5 - userPriority;
 }
 
-/**
- * Convert Todoist API priority back to user-facing priority.
- */
 function toUserPriority(apiPriority: number): number {
   return 5 - apiPriority;
 }
 
-interface TodoistTask {
+function uuid(): string {
+  return crypto.randomUUID();
+}
+
+interface SyncTask {
   id: string;
   content: string;
   description: string;
@@ -29,13 +29,11 @@ interface TodoistTask {
   due: { date: string; datetime?: string; is_recurring: boolean } | null;
   deadline: { date: string; datetime?: string } | null;
   checked: boolean;
-  note_count: number;
   added_at: string;
-  child_order: number;
+  updated_at: string;
 }
 
-/** Slim down task object to reduce token usage */
-function slimTask(t: TodoistTask) {
+function slimTask(t: SyncTask) {
   return {
     id: t.id,
     content: t.content,
@@ -44,19 +42,18 @@ function slimTask(t: TodoistTask) {
     parentId: t.parent_id || undefined,
     labels: t.labels?.length > 0 ? t.labels : undefined,
     priority: toUserPriority(t.priority),
-    due: t.due ? { date: t.due.date, datetime: t.due.datetime, recurring: t.due.is_recurring } : undefined,
+    due: t.due || undefined,
     deadline: t.deadline || undefined,
-    comments: t.note_count || undefined,
+    checked: t.checked,
   };
 }
 
-/** Extract tasks array from Todoist API response (v1 wraps in { results: [...] }) */
-function extractTasks(data: unknown): TodoistTask[] {
-  if (Array.isArray(data)) return data;
-  if (data && typeof data === "object" && "results" in data) {
-    return (data as { results: TodoistTask[] }).results;
-  }
-  return [];
+async function fetchAllItems(env: Env): Promise<{ items?: SyncTask[]; error?: Response }> {
+  const { data, error } = await syncRead(env, ["items"]);
+  if (error) return { error };
+  const items = (data!.items as SyncTask[]) || [];
+  // Filter out deleted/completed items
+  return { items: items.filter((t) => !t.checked) };
 }
 
 export async function handleTasksList(
@@ -67,39 +64,24 @@ export async function handleTasksList(
     projectId?: string;
     sectionId?: string;
     label?: string;
-    filter?: string;
     search?: string | string[];
     limit?: number;
   };
 
-  const params = new URLSearchParams();
-  if (body.projectId) params.set("project_id", body.projectId);
-  if (body.sectionId) params.set("section_id", body.sectionId);
-  if (body.label) params.set("label", body.label);
-  // Note: Todoist v1 API 'filter' param doesn't work for text search.
-  // We do client-side filtering with the 'search' param instead.
+  const { items, error } = await fetchAllItems(env);
+  if (error) return error;
 
-  // Paginate through all results
-  const allTasks: TodoistTask[] = [];
-  let cursor: string | null = null;
+  let result = items!;
 
-  do {
-    const pageParams = new URLSearchParams(params);
-    if (cursor) pageParams.set("cursor", cursor);
-
-    const queryStr = pageParams.toString();
-    const { data, error } = await todoistJson<{
-      results?: TodoistTask[];
-      next_cursor?: string;
-    }>(env, `/tasks${queryStr ? `?${queryStr}` : ""}`);
-    if (error) return error;
-
-    const tasks = extractTasks(data);
-    allTasks.push(...tasks);
-    cursor = (data as { next_cursor?: string })?.next_cursor ?? null;
-  } while (cursor);
-
-  let result = allTasks;
+  if (body.projectId) {
+    result = result.filter((t) => t.project_id === body.projectId);
+  }
+  if (body.sectionId) {
+    result = result.filter((t) => t.section_id === body.sectionId);
+  }
+  if (body.label) {
+    result = result.filter((t) => t.labels?.includes(body.label!));
+  }
 
   // Client-side text search — supports single string or array of phrases (OR match)
   if (body.search) {
@@ -112,12 +94,11 @@ export async function handleTasksList(
     });
   }
 
-  // Sort by added_at descending (most recent first)
+  // Sort by most recently added first
   result.sort(
     (a, b) => new Date(b.added_at).getTime() - new Date(a.added_at).getTime(),
   );
 
-  // Apply limit
   if (body.limit && body.limit > 0) {
     result = result.slice(0, body.limit);
   }
@@ -130,18 +111,114 @@ export async function handleTasksGet(
   request: Request,
 ): Promise<Response> {
   const body = (await request.json()) as { taskId: string };
-
   if (!body.taskId) {
     return Response.json({ error: "taskId is required" }, { status: 400 });
   }
 
-  const { data, error } = await todoistJson<TodoistTask>(
-    env,
-    `/tasks/${body.taskId}`,
-  );
+  const { items, error } = await fetchAllItems(env);
   if (error) return error;
 
-  return Response.json({ task: slimTask(data!) });
+  const task = items!.find((t) => t.id === body.taskId);
+  if (!task) {
+    return Response.json({ error: "Task not found" }, { status: 404 });
+  }
+
+  return Response.json({ task: slimTask(task) });
+}
+
+/**
+ * Extract time from a dueString like "today at 6pm" or "April 5 at 10:30am".
+ * Returns { dateOnly, reminderTime } where dateOnly has the time stripped
+ * and reminderTime is a normalized time string (e.g., "18:00").
+ * If no time is found, reminderTime is null.
+ */
+function splitDateAndTime(dueString: string): {
+  dateOnly: string;
+  reminderTime: string | null;
+} {
+  // Match patterns like "at 6pm", "at 10:30am", "at 18:00"
+  const timePattern = /\s+at\s+(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)/i;
+  const match = dueString.match(timePattern);
+
+  if (!match) {
+    return { dateOnly: dueString, reminderTime: null };
+  }
+
+  const dateOnly = dueString.replace(timePattern, "").trim();
+  const timeStr = match[1].trim().toLowerCase();
+
+  // Parse the time
+  let hours: number;
+  let minutes = 0;
+
+  const colonMatch = timeStr.match(/^(\d{1,2}):(\d{2})\s*(am|pm)?$/);
+  const simpleMatch = timeStr.match(/^(\d{1,2})\s*(am|pm)$/);
+
+  if (colonMatch) {
+    hours = parseInt(colonMatch[1]);
+    minutes = parseInt(colonMatch[2]);
+    const ampm = colonMatch[3];
+    if (ampm === "pm" && hours < 12) hours += 12;
+    if (ampm === "am" && hours === 12) hours = 0;
+  } else if (simpleMatch) {
+    hours = parseInt(simpleMatch[1]);
+    const ampm = simpleMatch[2];
+    if (ampm === "pm" && hours < 12) hours += 12;
+    if (ampm === "am" && hours === 12) hours = 0;
+  } else {
+    return { dateOnly: dueString, reminderTime: null };
+  }
+
+  const reminderTime = `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
+  return { dateOnly, reminderTime };
+}
+
+/**
+ * Resolve a relative date string like "today", "tomorrow" to a YYYY-MM-DD date.
+ */
+function resolveDate(dateStr: string, timezone?: string): string {
+  const lower = dateStr.toLowerCase().trim();
+
+  // Get "now" in the user's timezone
+  const nowLocal = timezone
+    ? new Date(new Date().toLocaleString("en-US", { timeZone: timezone }))
+    : new Date();
+
+  function formatDate(d: Date): string {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  }
+
+  if (lower === "today" || lower === "tonight" || lower === "this evening") {
+    return formatDate(nowLocal);
+  }
+  if (lower === "tomorrow") {
+    nowLocal.setDate(nowLocal.getDate() + 1);
+    return formatDate(nowLocal);
+  }
+
+  // Handle day names (e.g., "friday", "next monday")
+  const dayNames = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
+  const cleanLower = lower.replace(/^next\s+/, "");
+  const dayIndex = dayNames.indexOf(cleanLower);
+  if (dayIndex !== -1) {
+    const currentDay = nowLocal.getDay();
+    let daysAhead = dayIndex - currentDay;
+    if (daysAhead <= 0) daysAhead += 7;
+    nowLocal.setDate(nowLocal.getDate() + daysAhead);
+    return formatDate(nowLocal);
+  }
+
+  // Try to parse as a date
+  const parsed = new Date(dateStr);
+  if (!isNaN(parsed.getTime())) {
+    return formatDate(parsed);
+  }
+
+  // Fallback to today in user's timezone
+  return formatDate(nowLocal);
 }
 
 export async function handleTasksCreate(
@@ -160,37 +237,74 @@ export async function handleTasksCreate(
     dueDate?: string;
     dueDatetime?: string;
     dueLang?: string;
-    assigneeId?: string;
-    duration?: number;
-    durationUnit?: string;
+    reminderTime?: string;
+    timezone?: string;
   };
 
   if (!body.content) {
     return Response.json({ error: "content is required" }, { status: 400 });
   }
 
-  const apiBody: Record<string, unknown> = { content: body.content };
-  if (body.description) apiBody.description = body.description;
-  if (body.projectId) apiBody.project_id = body.projectId;
-  if (body.sectionId) apiBody.section_id = body.sectionId;
-  if (body.parentId) apiBody.parent_id = body.parentId;
-  if (body.labels) apiBody.labels = body.labels;
-  if (body.priority) apiBody.priority = toApiPriority(body.priority);
-  if (body.dueString) apiBody.due_string = body.dueString;
-  if (body.dueDate) apiBody.due_date = body.dueDate;
-  if (body.dueDatetime) apiBody.due_datetime = body.dueDatetime;
-  if (body.dueLang) apiBody.due_lang = body.dueLang;
-  if (body.assigneeId) apiBody.assignee_id = body.assigneeId;
-  if (body.duration) apiBody.duration = body.duration;
-  if (body.durationUnit) apiBody.duration_unit = body.durationUnit;
+  // If dueString contains a time (e.g., "today at 6pm"), split it:
+  // - due date gets the date only
+  // - a reminder is automatically created with the time
+  let dueString = body.dueString;
+  let autoReminderTime: string | null = body.reminderTime || null;
 
-  const { data, error } = await todoistJson<TodoistTask>(env, "/tasks", {
-    method: "POST",
-    body: JSON.stringify(apiBody),
-  });
+  if (dueString) {
+    const { dateOnly, reminderTime } = splitDateAndTime(dueString);
+    if (reminderTime) {
+      dueString = dateOnly;
+      autoReminderTime = autoReminderTime || reminderTime;
+    }
+  }
+
+  const args: Record<string, unknown> = { content: body.content };
+  if (body.description) args.description = body.description;
+  if (body.projectId) args.project_id = body.projectId;
+  if (body.sectionId) args.section_id = body.sectionId;
+  if (body.parentId) args.parent_id = body.parentId;
+  if (body.labels) args.labels = body.labels;
+  if (body.priority) args.priority = toApiPriority(body.priority);
+  // Sync API uses due.date, not due_string. Resolve relative dates to YYYY-MM-DD.
+  if (dueString) {
+    args.due = { date: resolveDate(dueString, body.timezone), timezone: body.timezone };
+  }
+  if (body.dueDate) args.due = { date: body.dueDate, timezone: body.timezone };
+
+  const taskTempId = uuid();
+  const commands: Array<{ type: string; uuid: string; temp_id?: string; args: Record<string, unknown> }> = [
+    { type: "item_add", uuid: uuid(), temp_id: taskTempId, args },
+  ];
+
+  // Auto-create reminder if a time was specified
+  if (autoReminderTime) {
+    const dateStr = body.dueDate || (dueString ? resolveDate(dueString, body.timezone) : resolveDate("today", body.timezone));
+    commands.push({
+      type: "reminder_add",
+      uuid: uuid(),
+      temp_id: uuid(),
+      args: {
+        item_id: taskTempId,
+        type: "absolute",
+        due: { date: `${dateStr}T${autoReminderTime}:00`, timezone: body.timezone },
+      },
+    });
+  }
+
+  const { data, error } = await syncWrite(env, commands);
   if (error) return error;
 
-  return Response.json({ task: slimTask(data!) });
+  const realId = data!.temp_id_mapping[taskTempId] || taskTempId;
+  return Response.json({
+    task: {
+      id: realId,
+      content: body.content,
+      dueDate: dueString || body.dueDate,
+      reminder: autoReminderTime || undefined,
+      ok: true,
+    },
+  });
 }
 
 export async function handleTasksUpdate(
@@ -206,34 +320,26 @@ export async function handleTasksUpdate(
     dueString?: string;
     dueDate?: string;
     dueDatetime?: string;
-    assigneeId?: string;
   };
 
   if (!body.taskId) {
     return Response.json({ error: "taskId is required" }, { status: 400 });
   }
 
-  const apiBody: Record<string, unknown> = {};
-  if (body.content) apiBody.content = body.content;
-  if (body.description !== undefined) apiBody.description = body.description;
-  if (body.labels) apiBody.labels = body.labels;
-  if (body.priority) apiBody.priority = toApiPriority(body.priority);
-  if (body.dueString) apiBody.due_string = body.dueString;
-  if (body.dueDate) apiBody.due_date = body.dueDate;
-  if (body.dueDatetime) apiBody.due_datetime = body.dueDatetime;
-  if (body.assigneeId !== undefined) apiBody.assignee_id = body.assigneeId;
+  const args: Record<string, unknown> = { id: body.taskId };
+  if (body.content) args.content = body.content;
+  if (body.description !== undefined) args.description = body.description;
+  if (body.labels) args.labels = body.labels;
+  if (body.priority) args.priority = toApiPriority(body.priority);
+  if (body.dueString) args.due = { date: resolveDate(body.dueString) };
+  if (body.dueDate) args.due = { date: body.dueDate };
 
-  const { data, error } = await todoistJson<TodoistTask>(
-    env,
-    `/tasks/${body.taskId}`,
-    {
-      method: "POST",
-      body: JSON.stringify(apiBody),
-    },
-  );
+  const { error } = await syncWrite(env, [
+    { type: "item_update", uuid: uuid(), args },
+  ]);
   if (error) return error;
 
-  return Response.json({ task: slimTask(data!) });
+  return Response.json({ ok: true, taskId: body.taskId });
 }
 
 export async function handleTasksSubtasks(
@@ -241,28 +347,14 @@ export async function handleTasksSubtasks(
   request: Request,
 ): Promise<Response> {
   const body = (await request.json()) as { taskId: string };
-
   if (!body.taskId) {
     return Response.json({ error: "taskId is required" }, { status: 400 });
   }
 
-  // Paginate through all tasks and filter by parent_id
-  const allTasks: TodoistTask[] = [];
-  let cursor: string | null = null;
+  const { items, error } = await fetchAllItems(env);
+  if (error) return error;
 
-  do {
-    const url: string = cursor ? `/tasks?cursor=${encodeURIComponent(cursor)}` : "/tasks";
-    const { data, error } = await todoistJson<{
-      results?: TodoistTask[];
-      next_cursor?: string;
-    }>(env, url);
-    if (error) return error;
-
-    allTasks.push(...extractTasks(data));
-    cursor = (data as { next_cursor?: string })?.next_cursor ?? null;
-  } while (cursor);
-
-  const subtasks = allTasks.filter((t) => t.parent_id === body.taskId);
+  const subtasks = items!.filter((t) => t.parent_id === body.taskId);
   return Response.json({ tasks: subtasks.map(slimTask) });
 }
 
@@ -271,19 +363,14 @@ export async function handleTasksComplete(
   request: Request,
 ): Promise<Response> {
   const body = (await request.json()) as { taskId: string };
-
   if (!body.taskId) {
     return Response.json({ error: "taskId is required" }, { status: 400 });
   }
 
-  const res = await todoistFetch(env, `/tasks/${body.taskId}/close`, {
-    method: "POST",
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    return Response.json({ error: text, status: res.status }, { status: res.status });
-  }
+  const { error } = await syncWrite(env, [
+    { type: "item_complete", uuid: uuid(), args: { id: body.taskId } },
+  ]);
+  if (error) return error;
 
   return Response.json({ ok: true });
 }
@@ -293,19 +380,51 @@ export async function handleTasksReopen(
   request: Request,
 ): Promise<Response> {
   const body = (await request.json()) as { taskId: string };
-
   if (!body.taskId) {
     return Response.json({ error: "taskId is required" }, { status: 400 });
   }
 
-  const res = await todoistFetch(env, `/tasks/${body.taskId}/reopen`, {
-    method: "POST",
-  });
+  const { error } = await syncWrite(env, [
+    { type: "item_uncomplete", uuid: uuid(), args: { id: body.taskId } },
+  ]);
+  if (error) return error;
 
-  if (!res.ok) {
-    const text = await res.text();
-    return Response.json({ error: text, status: res.status }, { status: res.status });
+  return Response.json({ ok: true });
+}
+
+export async function handleTasksReminder(
+  env: Env,
+  request: Request,
+): Promise<Response> {
+  const body = (await request.json()) as {
+    taskId: string;
+    type: "absolute" | "relative";
+    dueString?: string;
+    minuteOffset?: number;
+  };
+
+  if (!body.taskId || !body.type) {
+    return Response.json(
+      { error: "taskId and type are required" },
+      { status: 400 },
+    );
   }
+
+  const args: Record<string, unknown> = {
+    item_id: body.taskId,
+    type: body.type,
+  };
+
+  if (body.type === "absolute" && body.dueString) {
+    args.due = { date: body.dueString };
+  } else if (body.type === "relative" && body.minuteOffset !== undefined) {
+    args.minute_offset = body.minuteOffset;
+  }
+
+  const { error } = await syncWrite(env, [
+    { type: "reminder_add", uuid: uuid(), temp_id: uuid(), args },
+  ]);
+  if (error) return error;
 
   return Response.json({ ok: true });
 }

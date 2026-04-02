@@ -7,6 +7,7 @@ import {
   handleTasksSubtasks,
   handleTasksComplete,
   handleTasksReopen,
+  handleTasksReminder,
 } from "./tasks.ts";
 import { handleProjectsList, handleProjectsGet } from "./projects.ts";
 import { handleCommentsList, handleCommentsCreate } from "./comments.ts";
@@ -30,6 +31,7 @@ export default {
       case "/v1/todoist/tasks/subtasks": return handleTasksSubtasks(env, request);
       case "/v1/todoist/tasks/complete": return handleTasksComplete(env, request);
       case "/v1/todoist/tasks/reopen":   return handleTasksReopen(env, request);
+      case "/v1/todoist/tasks/reminder": return handleTasksReminder(env, request);
 
       // Projects
       case "/v1/todoist/projects/list":  return handleProjectsList(env, request);

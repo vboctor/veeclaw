@@ -46,6 +46,7 @@ When listing top priority Todoist items, factor in:
 
 **Todoist**: active → completed (via close/reopen)
 - Priority levels: 1 (urgent/p1), 2 (high/p2), 3 (medium/p3), 4 (normal/p4)
+- When creating a Todoist task, pass the user's date and time directly in `dueString` (e.g., "today at 6pm", "tomorrow", "Friday at 10am"). The system automatically splits the date and time — setting the date as the due date and creating a reminder at the specified time. No need for separate reminder calls when creating tasks.
 
 ## URLs
 
@@ -67,13 +68,9 @@ When referencing items, include clickable links:
 
 ## Confirmation Flow
 
-- Require explicit user confirmation before ALL write actions: creating issues/tasks, updating, changing status, assigning, adding comments, monitoring/unmonitoring, and updating wiki pages.
-- In the confirmation, always include:
-  - The **system and instance** the action will be executed on (e.g., "on MantisHub **tasks** instance", "on GitHub **owner/repo**", "on Todoist")
-  - The **full action details** (e.g., issue ID, new status, assignee name, comment text)
-- For read-only operations (list, get, search), proceed directly without confirmation.
-- For Todoist task completion and subtask creation, proceed without confirmation (easily reversible).
-- When the user gives a clear batch instruction (e.g., "add subtasks X and Y to each of these tasks"), execute all operations without asking for per-task confirmation. Summarize what was done afterward.
+**Todoist**: NEVER confirm. Execute all Todoist actions immediately — single or batch — and report what was done. Todoist actions are easily reversible.
+
+**MantisHub / GitHub**: Confirm before write actions (create, update, status change, assign). In the confirmation include the system/instance and full action details. Read-only operations proceed without confirmation.
 
 ## Multi-Instance (MantisHub)
 

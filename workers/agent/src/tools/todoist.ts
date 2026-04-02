@@ -10,6 +10,7 @@ export const TODOIST_TOOL_ROUTES: Record<string, string> = {
   todoist_tasks_subtasks: "/v1/todoist/tasks/subtasks",
   todoist_tasks_complete: "/v1/todoist/tasks/complete",
   todoist_tasks_reopen: "/v1/todoist/tasks/reopen",
+  todoist_tasks_reminder: "/v1/todoist/tasks/reminder",
   todoist_projects_list: "/v1/todoist/projects/list",
   todoist_projects_get: "/v1/todoist/projects/get",
   todoist_comments_list: "/v1/todoist/comments/list",
@@ -107,19 +108,22 @@ export const TODOIST_TOOLS: Tool[] = [
           dueString: {
             type: "string",
             description:
-              "Natural language due date (e.g., 'tomorrow at 2pm', 'every monday', 'in 3 days')",
+              "Due date in natural language (e.g., 'today', 'tomorrow', 'Friday', 'today at 6pm'). If a time is included, the system automatically sets the date as the due date and creates a reminder at the specified time.",
           },
           dueDate: {
             type: "string",
-            description: "Due date in YYYY-MM-DD format (date only, no time)",
+            description: "Due date in YYYY-MM-DD format (alternative to dueString)",
           },
-          dueDatetime: {
+          reminderTime: {
             type: "string",
-            description:
-              "Due datetime in RFC3339 format (e.g., '2026-04-01T14:00:00Z')",
+            description: "Explicit reminder time in HH:MM format (e.g., '18:00'). Only needed if dueString doesn't include a time.",
+          },
+          timezone: {
+            type: "string",
+            description: "User's IANA timezone (e.g., 'America/Los_Angeles'). Required for correct date resolution of relative dates like 'today', 'tonight'.",
           },
         },
-        required: ["content"],
+        required: ["content", "timezone"],
       },
     },
   },
@@ -203,6 +207,37 @@ export const TODOIST_TOOLS: Tool[] = [
           taskId: { type: "string", description: "Task ID to reopen" },
         },
         required: ["taskId"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "todoist_tasks_reminder",
+      description:
+        "Set a reminder on a Todoist task. Use 'absolute' for a specific date/time or 'relative' for minutes before the due date.",
+      parameters: {
+        type: "object",
+        properties: {
+          taskId: { type: "string", description: "Task ID to set reminder on" },
+          type: {
+            type: "string",
+            enum: ["absolute", "relative"],
+            description:
+              "'absolute' for a specific date/time, 'relative' for N minutes before due date",
+          },
+          dueString: {
+            type: "string",
+            description:
+              "For absolute reminders: date/time (e.g., '2026-04-05 10:00')",
+          },
+          minuteOffset: {
+            type: "number",
+            description:
+              "For relative reminders: minutes before due date (e.g., 30 = 30 min before)",
+          },
+        },
+        required: ["taskId", "type"],
       },
     },
   },
