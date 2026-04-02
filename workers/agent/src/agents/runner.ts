@@ -6,6 +6,19 @@ import type {
 import type { Env } from "../index.ts";
 import { executeToolCalls } from "../tools/execute.ts";
 
+export interface AgentUsage {
+  totalPromptTokens: number;
+  totalCompletionTokens: number;
+  totalCacheWriteTokens: number;
+  totalCacheReadTokens: number;
+  rounds: number;
+}
+
+export interface AgentResult {
+  response: CompletionResponse;
+  usage: AgentUsage;
+}
+
 export interface RunAgentOptions {
   request: CompletionRequest;
   env: Env;
@@ -24,6 +37,13 @@ export interface RunAgentOptions {
 export async function runAgent(
   opts: RunAgentOptions
 ): Promise<CompletionResponse> {
+  const { response } = await runAgentWithUsage(opts);
+  return response;
+}
+
+export async function runAgentWithUsage(
+  opts: RunAgentOptions
+): Promise<AgentResult> {
   const {
     env,
     routes,
@@ -34,6 +54,14 @@ export async function runAgent(
   } = opts;
   let currentReq = opts.request;
   let data!: CompletionResponse;
+
+  const usage: AgentUsage = {
+    totalPromptTokens: 0,
+    totalCompletionTokens: 0,
+    totalCacheWriteTokens: 0,
+    totalCacheReadTokens: 0,
+    rounds: 0,
+  };
 
   for (let round = 0; round < maxRounds; round++) {
     const response = await env.LLM_GATEWAY.fetch(
@@ -51,6 +79,24 @@ export async function runAgent(
     }
 
     data = (await response.json()) as CompletionResponse;
+    usage.rounds = round + 1;
+
+    // Accumulate usage and log cache metrics
+    if (data.usage) {
+      const u = data.usage;
+      usage.totalPromptTokens += u.prompt_tokens;
+      usage.totalCompletionTokens += u.completion_tokens;
+      usage.totalCacheWriteTokens += u.cache_creation_input_tokens ?? 0;
+      usage.totalCacheReadTokens += u.cache_read_input_tokens ?? 0;
+
+      const cacheTotal = (u.cache_creation_input_tokens ?? 0) + (u.cache_read_input_tokens ?? 0);
+      const hitPct = cacheTotal > 0
+        ? Math.round(((u.cache_read_input_tokens ?? 0) / cacheTotal) * 100)
+        : 0;
+      console.log(
+        `[llm] round=${round} prompt=${u.prompt_tokens} completion=${u.completion_tokens} cache_write=${u.cache_creation_input_tokens ?? 0} cache_read=${u.cache_read_input_tokens ?? 0} hit=${hitPct}%`
+      );
+    }
 
     if (!data.tool_calls?.length) break;
 
@@ -76,58 +122,50 @@ export async function runAgent(
     if (env.MANTISHUB_CONNECTOR) connectors.MANTISHUB_CONNECTOR = env.MANTISHUB_CONNECTOR;
     if (env.TODOIST_CONNECTOR) connectors.TODOIST_CONNECTOR = env.TODOIST_CONNECTOR;
 
-    const connectorResults =
+    // Execute all tool types in parallel
+    const [connectorResults, internalResults, delegateResults] = await Promise.all([
+      // Connector-routed tool calls
       connectorCalls.length > 0
-        ? await executeToolCalls(connectorCalls, connectors, connectorMap, routes)
-        : [];
+        ? executeToolCalls(connectorCalls, connectors, connectorMap, routes)
+        : Promise.resolve([]),
 
-    // Execute internal tool calls
-    const internalResults: Message[] = await Promise.all(
-      internalCalls.map(async (call) => {
-        const handler = internalToolHandlers![call.function.name];
-        let result: string;
-        try {
-          result = await handler(call.function.arguments);
-        } catch (err) {
-          result = JSON.stringify({
-            error:
-              err instanceof Error ? err.message : "Internal tool execution failed",
-          });
-        }
-        return {
-          role: "tool" as const,
-          content: result,
-          tool_call_id: call.id,
-        };
-      })
-    );
+      // Internal tool calls
+      Promise.all(
+        internalCalls.map(async (call): Promise<Message> => {
+          const handler = internalToolHandlers![call.function.name];
+          let result: string;
+          try {
+            result = await handler(call.function.arguments);
+          } catch (err) {
+            result = JSON.stringify({
+              error:
+                err instanceof Error ? err.message : "Internal tool execution failed",
+            });
+          }
+          return { role: "tool", content: result, tool_call_id: call.id };
+        })
+      ),
 
-    // Execute delegation calls
-    const delegateResults: Message[] = [];
-    for (const call of delegateCalls) {
-      const args = JSON.parse(call.function.arguments) as {
-        agent: string;
-        task: string;
-        instructions?: string;
-      };
-      let result: string;
-      if (onDelegateCall) {
-        result = await onDelegateCall(
-          args.agent,
-          args.task,
-          args.instructions
-        );
-      } else {
-        result = JSON.stringify({
-          error: "Delegation not supported for this agent",
-        });
-      }
-      delegateResults.push({
-        role: "tool",
-        content: result,
-        tool_call_id: call.id,
-      });
-    }
+      // Delegation calls (now parallel)
+      Promise.all(
+        delegateCalls.map(async (call): Promise<Message> => {
+          const args = JSON.parse(call.function.arguments) as {
+            agent: string;
+            task: string;
+            instructions?: string;
+          };
+          let result: string;
+          if (onDelegateCall) {
+            result = await onDelegateCall(args.agent, args.task, args.instructions);
+          } else {
+            result = JSON.stringify({
+              error: "Delegation not supported for this agent",
+            });
+          }
+          return { role: "tool", content: result, tool_call_id: call.id };
+        })
+      ),
+    ]);
 
     const assistantMsg: Message = {
       role: "assistant",
@@ -147,5 +185,5 @@ export async function runAgent(
     };
   }
 
-  return data;
+  return { response: data, usage };
 }

@@ -23,8 +23,13 @@ export interface Tool {
   };
 }
 
+export interface CacheSegment {
+  text: string;
+  cache_control?: { type: "ephemeral" };
+}
+
 export interface CompletionRequest {
-  system?: string;
+  system?: string | CacheSegment[];
   messages: Message[];
   tools?: Tool[];
   model?: string;

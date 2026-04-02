@@ -2,6 +2,7 @@ export type {
   Message,
   Tool,
   ToolCall,
+  CacheSegment,
   CompletionRequest,
   CompletionResponse,
   LLMGateway,

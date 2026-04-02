@@ -1,4 +1,5 @@
 import type {
+  CacheSegment,
   CompletionRequest,
   CompletionResponse,
   Message,
@@ -21,7 +22,7 @@ import { runHeartbeat } from "./schedule/heartbeat.ts";
 import { dispatchScheduleEntry } from "./schedule/dispatch.ts";
 import { getOrchestrator } from "./agents/loader.ts";
 import { resolveSkills } from "./skills/registry.ts";
-import { runAgent } from "./agents/runner.ts";
+import { runAgent, runAgentWithUsage } from "./agents/runner.ts";
 import {
   DELEGATE_TOOL,
   handleDelegation,
@@ -40,6 +41,15 @@ export interface Env {
   DEFAULT_CHAT_ID: string;
 }
 
+function buildTimeContext(): string {
+  const now = new Date();
+  now.setSeconds(0, 0); // Coarsen to minute granularity for cacheability
+  const pdt = new Date(
+    now.toLocaleString("en-US", { timeZone: "America/Los_Angeles" })
+  );
+  return `Current time: ${now.toISOString()} | Local: ${pdt.toLocaleDateString("en-US", { weekday: "short", year: "numeric", month: "short", day: "numeric" })} ${pdt.toLocaleTimeString("en-US", { hour12: true })} PT`;
+}
+
 function applySystemPrompt(
   req: CompletionRequest,
   prompt: string,
@@ -47,23 +57,24 @@ function applySystemPrompt(
     skillPrompts?: string[];
   } = {}
 ): CompletionRequest {
-  const now = new Date();
-  const pdt = new Date(
-    now.toLocaleString("en-US", { timeZone: "America/Los_Angeles" })
-  );
-  const timeContext = `Current datetime: ${now.toISOString()} | User's local time: ${pdt.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })} ${pdt.toLocaleTimeString("en-US", { hour12: true })} (America/Los_Angeles). Do not search for the current time — use this value directly.`;
-
-  const agentListing = buildAgentListing();
-  const parts = [prompt, agentListing, timeContext];
-
-  // Full skill prompts — injected for active skills
+  // Segment 1: static prefix (cached) — agent prompt + listing + skills
+  const staticParts = [prompt, buildAgentListing()];
   if (opts.skillPrompts?.length) {
-    parts.push(...opts.skillPrompts);
+    staticParts.push(...opts.skillPrompts);
   }
 
-  const base = parts.join("\n\n");
-  const system = req.system ? `${base}\n\n---\n\n${req.system}` : base;
-  return { ...req, system };
+  const segments: CacheSegment[] = [
+    { text: staticParts.join("\n\n"), cache_control: { type: "ephemeral" } },
+  ];
+
+  // Segment 2: dynamic suffix (uncached) — time context + caller system
+  const dynamicParts = [buildTimeContext()];
+  if (req.system && typeof req.system === "string") {
+    dynamicParts.push(req.system);
+  }
+  segments.push({ text: dynamicParts.join("\n\n") });
+
+  return { ...req, system: segments };
 }
 
 function unauthorized(): Response {
@@ -148,7 +159,7 @@ async function handleComplete(
     plugins: plugins.length > 0 ? plugins : undefined,
   };
 
-  const data = await runAgent({
+  const { response: data, usage } = await runAgentWithUsage({
     request: enriched,
     env,
     routes,
@@ -157,6 +168,10 @@ async function handleComplete(
     onDelegateCall: (agentId, task, instructions) =>
       handleDelegation(agentId, task, instructions, env),
   });
+
+  console.log(
+    `[agent] rounds=${usage.rounds} prompt=${usage.totalPromptTokens} completion=${usage.totalCompletionTokens} cache_write=${usage.totalCacheWriteTokens} cache_read=${usage.totalCacheReadTokens}`
+  );
 
   const result: CompletionResponse = {
     ...data,

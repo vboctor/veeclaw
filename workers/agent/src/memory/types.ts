@@ -8,7 +8,7 @@ export interface MemoryConfig {
 }
 
 export const DEFAULT_MEMORY_CONFIG: MemoryConfig = {
-  workingWindow: 20,
+  workingWindow: 14,
   summaryMaxTokens: 600,
   factsMaxTokens: 800,
   staleDays: 60,

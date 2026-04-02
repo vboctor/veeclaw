@@ -33,8 +33,16 @@ async function executeToolCall(
     const text = await res.text();
 
     // Truncate very large responses to avoid blowing up context
-    if (text.length > 50_000) {
-      return text.slice(0, 50_000) + "\n... [truncated]";
+    const MAX_TOOL_RESPONSE_CHARS = 20_000;
+    if (text.length > MAX_TOOL_RESPONSE_CHARS) {
+      // For JSON arrays, truncate at item boundaries
+      if (text.startsWith("[")) {
+        const cutoff = text.lastIndexOf("},", MAX_TOOL_RESPONSE_CHARS);
+        if (cutoff > 0) {
+          return text.slice(0, cutoff + 1) + "\n]  // ... [truncated]";
+        }
+      }
+      return text.slice(0, MAX_TOOL_RESPONSE_CHARS) + "\n... [truncated]";
     }
 
     return text;

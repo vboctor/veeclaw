@@ -1,4 +1,5 @@
 import type {
+  CacheSegment,
   CompletionRequest,
   ScheduleEntry,
   PromptScheduleEntry,
@@ -26,12 +27,23 @@ function applySystemPrompt(
   prompt: string
 ): CompletionRequest {
   const now = new Date();
-  const timeContext = `Current datetime: ${now.toISOString()} (${now.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })} ${now.toLocaleTimeString("en-US", { hour12: true })})`;
+  now.setSeconds(0, 0);
+  const timeContext = `Current time: ${now.toISOString()} (${now.toLocaleDateString("en-US", { weekday: "short", year: "numeric", month: "short", day: "numeric" })} ${now.toLocaleTimeString("en-US", { hour12: true })})`;
 
+  // Segment 1: static prefix (cached) — agent prompt + listing
   const agentListing = buildAgentListing();
-  const base = `${prompt}\n\n${agentListing}\n\n${timeContext}`;
-  const system = req.system ? `${base}\n\n---\n\n${req.system}` : base;
-  return { ...req, system };
+  const segments: CacheSegment[] = [
+    { text: `${prompt}\n\n${agentListing}`, cache_control: { type: "ephemeral" } },
+  ];
+
+  // Segment 2: dynamic suffix (uncached) — time + caller system
+  const dynamicParts = [timeContext];
+  if (req.system && typeof req.system === "string") {
+    dynamicParts.push(req.system);
+  }
+  segments.push({ text: dynamicParts.join("\n\n") });
+
+  return { ...req, system: segments };
 }
 
 function chunkText(text: string, maxLen: number): string[] {

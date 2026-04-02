@@ -1,4 +1,5 @@
 import type {
+  CacheSegment,
   CompletionRequest,
   CompletionResponse,
   Message,
@@ -16,25 +17,39 @@ function isAnthropicModel(model: string): boolean {
   return model.includes("anthropic/") || model.includes("claude");
 }
 
+function buildSystemContent(
+  system: string | CacheSegment[],
+  cacheEnabled: boolean,
+): string | Record<string, unknown>[] {
+  if (typeof system === "string") {
+    // Legacy: single string — wrap with one cache breakpoint
+    return cacheEnabled
+      ? [{ type: "text", text: system, cache_control: { type: "ephemeral" } }]
+      : system;
+  }
+
+  // Multi-segment: each segment becomes its own content block
+  if (!cacheEnabled) {
+    return system.map((s) => s.text).join("\n\n");
+  }
+
+  return system.map((seg) => {
+    const block: Record<string, unknown> = { type: "text", text: seg.text };
+    if (seg.cache_control) block.cache_control = seg.cache_control;
+    return block;
+  });
+}
+
 function buildMessages(
   req: CompletionRequest,
   cacheEnabled: boolean,
 ): Record<string, unknown>[] {
   const msgs: Record<string, unknown>[] = [];
   if (req.system) {
-    const systemMsg: Record<string, unknown> = {
+    msgs.push({
       role: "system",
-      content: cacheEnabled
-        ? [
-            {
-              type: "text",
-              text: req.system,
-              cache_control: { type: "ephemeral" },
-            },
-          ]
-        : req.system,
-    };
-    msgs.push(systemMsg);
+      content: buildSystemContent(req.system, cacheEnabled),
+    });
   }
   for (const msg of req.messages) {
     const m: Record<string, unknown> = { role: msg.role, content: msg.content };

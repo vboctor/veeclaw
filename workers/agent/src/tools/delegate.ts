@@ -1,4 +1,4 @@
-import type { Tool, CompletionRequest } from "@veeclaw/shared";
+import type { Tool, CacheSegment, CompletionRequest } from "@veeclaw/shared";
 import type { Env } from "../index.ts";
 import { getAgent, listAgents } from "../agents/loader.ts";
 import { resolveSkills } from "../skills/registry.ts";
@@ -35,17 +35,18 @@ export const DELEGATE_TOOL: Tool = {
 
 function buildTimeContext(): string {
   const now = new Date();
+  now.setSeconds(0, 0);
   const pdt = new Date(
     now.toLocaleString("en-US", { timeZone: "America/Los_Angeles" })
   );
-  return `Current datetime: ${now.toISOString()} | User's local time: ${pdt.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" })} ${pdt.toLocaleTimeString("en-US", { hour12: true })} (America/Los_Angeles).`;
+  return `Current time: ${now.toISOString()} | Local: ${pdt.toLocaleDateString("en-US", { weekday: "short", year: "numeric", month: "short", day: "numeric" })} ${pdt.toLocaleTimeString("en-US", { hour12: true })} PT`;
 }
 
 /** Build the dynamic agent listing for Vee's system prompt. */
 export function buildAgentListing(): string {
   const agents = listAgents();
   const lines = agents.map((a) => `- **${a.id}**: ${a.description}`);
-  return `## Available Agents\n\nYou can delegate tasks to these specialist agents using the \`delegate_to_agent\` tool:\n\n${lines.join("\n")}\n\nDelegate when a task requires an agent's specialty. For simple questions you can answer directly, respond without delegating.`;
+  return `## Agents\n${lines.join("\n")}`;
 }
 
 export async function handleDelegation(
@@ -62,14 +63,22 @@ export async function handleDelegation(
   const { tools, routes, connectorMap, plugins, prompts, internalTools } =
     resolveSkills(agent.skills);
 
-  let system = agent.prompt;
+  // Segment 1: static prefix (cached) — agent prompt + skills
+  const staticParts = [agent.prompt];
   if (prompts.length > 0) {
-    system += `\n\n${prompts.join("\n\n")}`;
+    staticParts.push(...prompts);
   }
-  system += `\n\n${buildTimeContext()}`;
+
+  const segments: CacheSegment[] = [
+    { text: staticParts.join("\n\n"), cache_control: { type: "ephemeral" } },
+  ];
+
+  // Segment 2: dynamic suffix (uncached) — time context + orchestrator instructions
+  const dynamicParts = [buildTimeContext()];
   if (instructions) {
-    system += `\n\n---\n\nAdditional instructions from the orchestrator:\n${instructions}`;
+    dynamicParts.push(`---\n\nAdditional instructions from the orchestrator:\n${instructions}`);
   }
+  segments.push({ text: dynamicParts.join("\n\n") });
 
   // Build internal tool handlers for skills that need them
   let internalToolHandlers: Record<string, (args: string) => Promise<string>> | undefined;
@@ -85,7 +94,7 @@ export async function handleDelegation(
   }
 
   const request: CompletionRequest = {
-    system,
+    system: segments,
     messages: [{ role: "user", content: task }],
     tools: tools.length > 0 ? tools : undefined,
     model: agent.model,
