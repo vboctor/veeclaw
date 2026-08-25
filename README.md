@@ -20,13 +20,18 @@ VeeClaw runs entirely on Cloudflare's serverless platform (free or $5/mo plan). 
 
 Dotted borders in the diagram indicate optional components that may not be present in every deployment.
 
+For the maintained technical documentation, see [`docs/`](docs/). Start with
+the [architecture guide](docs/architecture.md), then see the [component guide](docs/components.md),
+[agents and tools](docs/agents-and-tools.md), [connectors](docs/connectors.md),
+and [operations guide](docs/operations.md).
+
 The design is serverless, sandboxed, and token-efficient. The cron heartbeat is a pure KV check — it only invokes the LLM (and consumes tokens) when a scheduled task actually fires. There is no periodic LLM-driven heartbeat. Users who want regular LLM-powered check-ins can create a recurring schedule (e.g. every 30 minutes) to achieve the same effect on their own terms.
 
 ## Features
 
 - **CLI TUI** — Interactive terminal chat with real-time streaming, markdown rendering, and model switching
 - **Agent Worker** — Cloudflare Worker that owns memory, system prompt, scheduling, tool calling, and dispatch
-- **Google Connector** — Cloudflare Worker providing Gmail, Google Calendar, and Google Drive access via direct REST APIs
+- **Connectors** — dedicated Cloudflare Workers for Google, GitHub, MantisHub, and Todoist access
 - **Tool calling** — LLM can invoke Google tools autonomously with a multi-round execution loop
 - **LLM Gateway Worker** — Cloudflare Worker passthrough to OpenRouter (internal only, no public access)
 - **Telegram Gateway Worker** — Telegram bot that relays messages through the Agent
@@ -50,10 +55,14 @@ workers/
     src/memory/               3-tier memory system (KV-backed)
     src/schedule/             Schedule store, heartbeat, dispatch, extraction, context injection
     src/tools/                Tool definitions and execution (Google tools)
-    src/prompts/              System prompt
+    src/agents/               Orchestrator and specialist agent YAML/prompts
+    src/skills/               Skill prompts and skill registry
   llm-gateway/                Cloudflare Worker — LLM passthrough to OpenRouter (internal only)
   telegram-gateway/           Cloudflare Worker — Telegram bot
   connectors/google/          Cloudflare Worker — Google Connector (Gmail, Calendar, Drive)
+  connectors/github/          Cloudflare Worker — GitHub Connector
+  connectors/mantishub/        Cloudflare Worker — MantisHub Connector
+  connectors/todoist/          Cloudflare Worker — Todoist Connector
 ```
 
 ## Prerequisites
@@ -137,8 +146,6 @@ The setup wizard detects existing state and only performs what's missing:
 
 Re-run `bun run setup` at any time — it's incremental and safe to repeat. Use `bun run setup --force` to redo everything.
 
-### Teardown
-
 ### Google Connector setup
 
 The Google Connector requires a one-time OAuth2 authorization:
@@ -153,9 +160,7 @@ bun run google-auth
 
 This opens a browser for Google consent, exchanges the authorization code for a refresh token, and saves `GOOGLE_REFRESH_TOKEN` to `.env`. Works for both consumer (gmail.com) and Google Workspace accounts.
 
-4. Run `bun run setup` to push the secrets to Cloudflare
-
-### Teardown
+1. Run `bun run setup` to push the secrets to Cloudflare
 
 To remove all deployed workers, KV namespaces, and the Telegram webhook:
 
@@ -352,7 +357,7 @@ VeeClaw is not the right choice for every use case:
 - **Vendor coupling**: VeeClaw runs on Cloudflare. Moving to another platform would require rearchitecting the worker and service binding model.
 - **Community**: OpenClaw has 247K stars and a large ecosystem. VeeClaw is a solo project.
 - **Voice**: OpenClaw has voice wake and talk modes. VeeClaw has no voice support.
-- **Agent swarms**: NanoClaw can run multiple Claude instances collaborating in parallel. VeeClaw runs a single agent.
+- **Agent collaboration**: NanoClaw can run multiple Claude instances collaborating in parallel. VeeClaw has one orchestrator that can run bundled specialists in parallel within a request, without a persistent swarm or shared specialist memory.
 
 ## Tech Stack
 
