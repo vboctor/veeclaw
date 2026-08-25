@@ -1,0 +1,11 @@
+scripts:
+  setup: |
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    bun install
+  archive: |
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    bun run undeploy
